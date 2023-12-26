@@ -1,10 +1,11 @@
-# Project Title
+# Image-Colorization
 
-Project description - this section here is for describing the project.
+This project is an extension of the colorization problem solved as part of
+UMass COMPSCI 689 course I took in Fall 2023.
 
 ## Data
 
-Project data - this section here is for posting links for the data
+The data for this problem as of yet is private and currently not hosted anywhere. Will post a drive link for it soon
 
 ## Best model
 
