@@ -1,7 +1,7 @@
 # this file is to read data folder
 # and get information such as length, x and y
 
-from common.config import data_dir
+from common.utils import get_config
 
 import numpy as np
 import os
@@ -9,16 +9,15 @@ import os
 class DataReader:
     
     def __init__(self):
-        pass
+        self.data_dir = get_config()['data_dir']
     
     def get_full_data(self):
-        data = np.load(os.path.join(data_dir, 'ae_data.npz'))
+        data = np.load(os.path.join(self.data_dir, 'ae_data.npz'))
         length = data['RGBtr'].shape[0] + data['RGBTe'].shape[0]
         return { 'data': data, 'len': length }
     
     def get_split_data(self):
-        print('data', data_dir)
-        data = np.load(os.path.join(data_dir, 'ae_data.npz'))
+        data = np.load(os.path.join(self.data_dir, 'ae_data.npz'))
         return {
             'RGBtr': data['RGBtr'],
             'Ltr': data['Ltr'],

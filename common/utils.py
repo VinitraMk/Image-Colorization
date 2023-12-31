@@ -1,10 +1,10 @@
-from common.config import root_dir
-
 from torchvision.io import read_image
 from PIL import Image
 import torch
 import os
 import yaml
+
+root_dir = ''
 
 def save_df_to_csv(df, filename, columns = []):
     if len(columns) == 0:
@@ -36,11 +36,6 @@ def read_yaml(ypath):
 def dump_yaml(ypath, datadict):
     with open(ypath, 'w') as outfile:
         yaml.dump(datadict, outfile, default_flow_style=False)
-    
-def get_exp_params():
-    yaml_fp = os.path.join(root_dir, 'run.yaml')
-    exp_params = read_yaml(yaml_fp)
-    return exp_params
 
 def init_config():
     root_dir = os.getcwd()
@@ -49,8 +44,13 @@ def init_config():
     config_params = read_yaml(config_path)
     config_params['root_dir'] = root_dir
     config_params['data_dir'] = data_dir
-    dump_yaml(config_path, config_params)
-    
+    dump_yaml(config_path, config_params)   
+
+def get_exp_params():
+    yaml_fp = os.path.join(root_dir, 'run.yaml')
+    exp_params = read_yaml(yaml_fp)
+    return exp_params
+
 def get_config():
     config_path = os.path.join(root_dir, 'config.yaml')
     config_params = read_yaml(config_path)

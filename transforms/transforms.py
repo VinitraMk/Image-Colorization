@@ -1,6 +1,6 @@
 from torchvision import transforms, utils
 import torch
-from common.config import X_key, y_key
+from common.utils import get_config
 
 class Resize(object):
     def __init__(self, output_size = 224, transform_y = False):
@@ -9,6 +9,8 @@ class Resize(object):
         self.transform_y = transform_y
         
     def __call__(self, sample):
+        config = get_config()
+        X_key, y_key = config['X_key'], config['y_key']
         image = sample[X_key]
         
         h, w = image.shape[:2]
@@ -43,6 +45,8 @@ class RandomCrop(object):
         self.transform_y = transform_y
         
     def __call__(self, sample):
+        config = get_config()
+        X_key, y_key = config['X_key'], config['y_key']
         image = sample[X_key]
         h, w = image.shape[:2]
         new_h, new_w = self.output_size
@@ -71,6 +75,8 @@ class CenterCrop(object):
         self.transform_y = transform_y
     
     def __call__(self, sample):
+        config = get_config()
+        X_key, y_key = config['X_key'], config['y_key']
         image = sample[X_key]
         assert isinstance(image, torch.tensor)
         image = transforms.functional.center_crop(image)
@@ -89,6 +95,8 @@ class ToTensor(object):
         self.transform_y = transform_y
     
     def __call__(self, sample):
+        config = get_config()
+        X_key, y_key = config['X_key'], config['y_key']
         image = sample[X_key]
         image = image.transpose(2, 0, 1)
         sample[X_key] = image
