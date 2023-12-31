@@ -1,6 +1,6 @@
 from torchvision import transforms, utils
 import torch
-from config.config import X_key, y_key
+from common.config import X_key, y_key
 
 class Resize(object):
     def __init__(self, output_size = 224, transform_y = False):

@@ -17,6 +17,7 @@ class DataReader:
         return { 'data': data, 'len': length }
     
     def get_split_data(self):
+        print('data', data_dir)
         data = np.load(os.path.join(data_dir, 'ae_data.npz'))
         return {
             'RGBtr': data['RGBtr'],
