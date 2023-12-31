@@ -1,1 +1,3 @@
 # yaml file to run the scripts and model experiments
+data_params:
+    batch_size: 64
