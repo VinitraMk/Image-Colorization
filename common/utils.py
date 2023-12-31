@@ -1,4 +1,4 @@
-from config.config import root_dir
+from common.config import root_dir
 
 from torchvision.io import read_image
 from PIL import Image
@@ -24,16 +24,36 @@ def img2tensor(imgnparr):
 def join_path(path_a, path_b):
     return os.path.join(path_a, path_b)
 
-def get_exp_params():
-    yaml_fp = os.path.join(root_dir, 'run.yaml')
-    exp_params = {}
-    with open(yaml_fp, "r") as stream:
+def read_yaml(ypath):
+    yml_params = {}
+    with open(ypath, "r") as stream:
         try:
-            exp_params = yaml.safe_load(stream)
+            yml_params = yaml.safe_load(stream)
         except yaml.YAMLError as err:
             print(err)
-    return exp_params
-            
-        
+    return yml_params
+
+def dump_yaml(ypath, datadict):
+    with open(ypath, 'w') as outfile:
+        yaml.dump(datadict, outfile, default_flow_style=False)
     
+def get_exp_params():
+    yaml_fp = os.path.join(root_dir, 'run.yaml')
+    exp_params = read_yaml(yaml_fp)
+    return exp_params
+
+def init_config():
+    root_dir = os.getcwd()
+    data_dir = os.path.join(root_dir, 'data')
+    config_path = os.path.join(root_dir, 'config.yaml')
+    config_params = read_yaml(config_path)
+    config_params['root_dir'] = root_dir
+    config_params['data_dir'] = data_dir
+    dump_yaml(config_path, config_params)
+    
+def get_config():
+    config_path = os.path.join(root_dir, 'config.yaml')
+    config_params = read_yaml(config_path)
+    return config_params
+
     
