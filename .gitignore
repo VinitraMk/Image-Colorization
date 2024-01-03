@@ -1,3 +1,6 @@
+*.zip
+*.tgz
+*.gz
 data/**
 *.pyc
 __pycache__/
