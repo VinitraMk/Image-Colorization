@@ -11,7 +11,7 @@ train:
     loss: 'mse'
     batch_interval: 512
     epoch_interval: 1
-    num_epochs: 2
+    num_epochs: 20
 model:
     name: 'unet'
     optimizer: 'Adam'

@@ -31,8 +31,8 @@ class Visualization:
         plt.title("Last model loss history")
         plt.legend()
         plt.show()
-        print("\nLast Model Loss:", self.bestm_valloss)
-        print(f"Last Model Accuracy: {self.bestm_valacc}\n\n")
+        print("\nLast Model Loss:", self.lastm_valloss)
+        print(f"Last Model Accuracy: {self.lastm_valacc}\n\n")
         
     def get_results(self):
         self.__plot_loss_history()
