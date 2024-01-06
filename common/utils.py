@@ -5,6 +5,7 @@ import os
 import yaml
 
 root_dir = ''
+config_params = {}
 
 def save_df_to_csv(df, filename, columns = []):
     if len(columns) == 0:
@@ -44,6 +45,7 @@ def init_config():
     config_params = read_yaml(config_path)
     config_params['root_dir'] = root_dir
     config_params['data_dir'] = data_dir
+    config_params['use_gpu'] = torch.cuda.is_available()
     dump_yaml(config_path, config_params)   
 
 def get_exp_params():
@@ -56,4 +58,34 @@ def get_config():
     config_params = read_yaml(config_path)
     return config_params
 
+def save2config(key, val):
+    config_params = get_config()
+    config_params[key] = val
+    config_path = os.path.join(root_dir, 'config.yaml')
+    dump_yaml(config_path, config_params)
+
+def get_accuracy(y_pred, y_true):
+    c = torch.sum(y_pred == y_true)
+    return c / len(y_true)
+
+def get_error(y_pred, y_true):
+    c = torch.sum(y_pred != y_true)
+    return c / len(y_true)
+
+def save_model_chkpt(chkpt_info, chkpt_filename, best_model = False):
+    if best_model:
+        fpath = os.path.join(config_params['root_dir'], 'models/best-models')
+    else:
+        fpath = os.path.join(config_params['root_dir'], 'models/chkpoints')
     
+    fpath = os.path.join(fpath, chkpt_filename)
+    with open(fpath, 'w') as fp:
+        torch.save(
+            chkpt_info,
+            fp
+        )
+        
+def load_model(model_path):
+    return torch.load(model_path)
+
+
