@@ -2,15 +2,15 @@ from common.utils import get_exp_params
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Subset
-from common.utils import get_accuracy, save_model_chkpt
+from common.utils import get_accuracy, save_model_chkpt, get_config
 
 class Experiment:
     
     def __get_optimizer(self, model, model_params, optimizer_name = 'Adam'):
         if optimizer_name == 'Adam':
-            return torch.optim.Adam(model, lr=model_params['lr'], weight_decay = model_params['weight_decay'], amsgrad = model_params['amsgrad'])
+            return torch.optim.Adam(model.parameters(), lr = model_params['lr'], weight_decay = model_params['weight_decay'], amsgrad = model_params['amsgrad'])
         elif optimizer_name == 'SGD':
-            return torch.optim.SGD(model, lr=model_params['lr'], weight_decay = model_params['weight_decay'], momentum = model_params['momentum'], nesterov= True)
+            return torch.optim.SGD(model.parameters(), lr = model_params['lr'], weight_decay = model_params['weight_decay'], momentum = model_params['momentum'], nesterov= True)
         else:
             raise SystemExit("Error: no valid optimizer name passed! Check run.yaml file")
 
@@ -18,8 +18,12 @@ class Experiment:
     def __init__(self, model, ftr_dataset):
         self.exp_params = get_exp_params()
         self.model = model
-        self.optimizer = self.__get_optimizer(self.model, self.exp_params['model'], self.exp_params['model']['name'])
-        self.ftr_dataset = ftr_dataset 
+        self.optimizer = self.__get_optimizer(self.model, self.exp_params['model'], self.exp_params['model']['optimizer'])
+        self.ftr_dataset = ftr_dataset
+        cfg = get_config()
+        self.X_key = cfg['X_key']
+        self.y_key = cfg['y_key']
+        self.device = 'cuda' if cfg['use_gpu'] else 'cpu'
         
     def __loss_fn(self, loss_name = 'cross-entropy'):
         if loss_name == 'cross-entropy':
@@ -31,7 +35,8 @@ class Experiment:
         
     def __conduct_training(self, train_loader, val_loader):
         loss_fn = self.__loss_fn()
-        batch_num = len(train_loader)
+        tr_batch_num = len(train_loader)
+        val_batch_num = len(val_loader)
         num_epochs = self.exp_params['train']['num_epochs']
         epoch_ivl = self.exp_params['train']['epoch_interval']
         batch_ivl = self.exp_params['train']['batch_interval']
@@ -42,57 +47,65 @@ class Experiment:
         tr_loss_history = []
         val_loss_history = []
         tr_loss = 0.0
+        self.model = self.model.to(self.device)
         for i in range(num_epochs):
             self.model.train()
-            print(f'Running Epoch {i}')
+            print(f'\tRunning Epoch {i}')
             running_loss = 0.0
-            for batch_idx, batch in train_loader:
+            print("\t\tRunning through train dataset")
+            for batch_idx, batch in enumerate(train_loader):
                 self.optimizer.zero_grad()
-                op = self.model(batch['image'])
-                loss = loss_fn(op, batch['label'])
+                batch[self.X_key] = batch[self.X_key].to(self.device)
+                batch[self.y_key] = batch[self.y_key].to(self.device)
+                op = self.model(batch[self.X_key])
+                #print('compare', op.size(), batch[self.y_key].size())
+                loss = loss_fn(op, batch[self.y_key])
                 loss.backward()
                 self.optimizer.step()
                 running_loss += loss.item()
                 if (batch_idx + 1) % batch_ivl == 0:
-                    print(f'\tBatch {batch_idx + 1} Loss: {running_loss / (batch_idx + 1)}')
-                
-            tr_loss = running_loss / batch_num
+                    print(f'\t\tBatch {batch_idx + 1} Loss: {running_loss / (batch_idx + 1)}')
+            tr_loss = running_loss / tr_batch_num
             tr_loss_history.append(tr_loss)
-            if i % epoch_ivl == 0:
-                print(f'Epoch {i} Loss: {tr_loss}\n')
-                        
+            
+            print('\t\tRunning through validation dataset')
             self.model.eval()
             val_loss = 0.0
             val_acc = 0
-            
-            print('Running through validation set')
-            for batch_idx, batch in val_loader:
-                lop = self.model(batch['image'])
-                loss = loss_fn(lop, batch['label'])
+            for batch_idx, batch in enumerate(val_loader):
+                batch[self.X_key] = batch[self.X_key].to(self.device)
+                batch[self.y_key] = batch[self.y_key].to(self.device)
+                lop = self.model(batch[self.X_key])
+                loss = loss_fn(lop, batch[self.y_key])
                 loss.backward()
                 val_loss += loss.item()
-                val_acc += get_accuracy(lop, batch['label'])
+                val_acc += get_accuracy(lop, batch[self.y_key])
                 
                 if (batch_idx + 1) % batch_ivl == 0:
                     print(f'\tBatch {batch_idx + 1} Last Model Loss: {val_loss / (batch_idx + 1)}')
                     print(f'\tBatch {batch_idx + 1} Best Model Loss: {val_loss / (batch_idx + 1)}')
-            val_loss /= batch_num
-            val_acc /= batch_num
+            val_loss /= val_batch_num
+            val_acc /= val_batch_num
+            val_loss_history.append(val_loss)
             if val_loss < best_loss:
                 best_loss = val_loss
                 best_model = self.model
                 best_acc = val_acc
                 best_model_trlosshistory = tr_loss_history
                 best_model_vallosshistory = val_loss_history
+            if i % epoch_ivl == 0:
+                print(f'\tEpoch {i} Training Loss: {tr_loss}')
+                print(f'\tEpoch {i} Validation Loss: {val_loss}')
+                print(f'\tEpoch {i} Validation Accuracy: {val_acc}\n')
 
 
         model_info = {
-            'best_model': best_model,
-            'best_loss': best_loss,
+            'best_model': best_model.cpu() if best_model != {} else {},
+            'best_model_valloss': best_loss,
             'best_model_valacc': best_acc,
             'best_model_trlosshistory': torch.tensor(best_model_trlosshistory),
             'best_model_vallosshistory': torch.tensor(best_model_vallosshistory),
-            'last_model': self.model,
+            'last_model': self.model.cpu(),
             'last_model_valloss': val_loss,
             'last_model_valacc': val_acc,
             'last_model_trlosshistory': torch.tensor(tr_loss_history),
@@ -109,8 +122,8 @@ class Experiment:
         if self.exp_params['train']['val_split_method'] == 'k-fold':
             k = self.exp_params['train']['k']
             vp = self.exp_params['train']['val_percentage']
-            fr = list(range(self.fr_train_dataset))
-            fl = len(self.fr_train_dataset)
+            fl = len(self.ftr_dataset)
+            fr = list(range(fl))
             vlen = int(vp * fl)
             vset_len = fl // k
             val_eei = list(range(vset_len, fl, vset_len))
@@ -124,7 +137,8 @@ class Experiment:
             lastm_tlh = torch.zeros(self.exp_params['train']['num_epochs'])
             lastm_vlh = torch.zeros(self.exp_params['train']['num_epochs'])
 
-            for ei in val_eei:
+            for ix, ei in enumerate(val_eei):
+                print(f"Running split {ix}")
                 val_idxs = fr[si:ei]
                 tr_idxs = fr[ei:]
                 si = ei
@@ -132,20 +146,20 @@ class Experiment:
                 val_dataset = Subset(self.ftr_dataset, val_idxs)
                 
                 train_loader = DataLoader(train_dataset,
-                batch_size = self.exp_params['train']['batch_size'],
-                shuffle = self.exp_params['train']['shuffle_data']
+                    batch_size = self.exp_params['train']['batch_size'],
+                    shuffle = self.exp_params['train']['shuffle_data']
                 )
                 val_loader = DataLoader(val_dataset,
                     batch_size = self.exp_params['train']['batch_size'],
                     shuffle = self.exp_params['train']['shuffle_data']
                 )
                 model_info = self.__conduct_training(train_loader, val_loader)
-                bestm_acc += model_info['best_model_acc']
-                bestm_loss += model_info['best_model_loss']
+                bestm_acc += model_info['best_model_valacc']
+                bestm_loss += model_info['best_model_valloss']
                 bestm_tlh += model_info['best_model_trlosshistory']
                 bestm_vlh += model_info['best_model_vallosshistory']
-                lastm_acc += model_info['last_model_acc']
-                lastm_loss += model_info['last_model_loss']
+                lastm_acc += model_info['last_model_valacc']
+                lastm_loss += model_info['last_model_valloss']
                 lastm_tlh += model_info['last_model_trlosshistory']
                 lastm_vlh += model_info['last_model_vallosshistory']
             bestm_loss/=k
@@ -156,16 +170,17 @@ class Experiment:
             lastm_acc/=k
             lastm_tlh/=k
             lastm_vlh/=k
-            model_info['best_model_lac'] = bestm_acc
-            model_info['best_model_loss'] = bestm_loss
+            model_info['best_model_valacc'] = bestm_acc
+            model_info['best_model_valloss'] = bestm_loss
             model_info['best_model_trlosshistory'] = bestm_tlh
             model_info['best_model_vallosshistory'] = bestm_vlh
-            model_info['last_model_lac'] = lastm_acc
-            model_info['last_model_loss'] = lastm_loss
+            model_info['last_model_valacc'] = lastm_acc
+            model_info['last_model_valloss'] = lastm_loss
             model_info['last_model_trlosshistory'] = lastm_tlh
             model_info['last_model_vallosshistory'] = lastm_vlh
             return model_info
         elif self.exp_params['train']['val_split_method'] == 'fix-split':
+            print("Running straight split")
             vp = self.exp_params['train']['val_percentage']
             vlen = int(vp * len(self.ftr_dataset))
             val_idxs = np.random.randint(0, len(self.ftr_dataset), vlen).tolist()
@@ -187,16 +202,17 @@ class Experiment:
             raise SystemExit("Error: no valid split method passed! Check run.yaml")
         
     def test(self, model, test_dataset):
+        model = model.cpu()
         test_loader = DataLoader(test_dataset, batch_size = self.exp_params["train"]["batch_size"], shuffle = True)
         model.eval()
         loss_fn = self.__loss_fn(self.exp_params["train"]["loss"])
         running_loss = 0.0
         acc = 0
-        for _, batch in test_loader:
-            op = model(batch['image'])
-            loss = loss_fn(op, batch['label'])
+        for _, batch in enumerate(test_loader):
+            op = model(batch[self.X_key])
+            loss = loss_fn(op, batch[self.y_key])
             running_loss += loss.item()
-            acc = get_accuracy(op, batch['label'])
+            acc = get_accuracy(op, batch[self.y_key])
         print("Loss:", running_loss/len(test_loader))
         print("Accuracy:", acc/len(test_loader), "\n")
         

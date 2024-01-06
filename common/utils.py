@@ -45,8 +45,7 @@ def init_config():
     config_params = read_yaml(config_path)
     config_params['root_dir'] = root_dir
     config_params['data_dir'] = data_dir
-    config_params['X_key'] = 'L'
-    config_params['y_key'] = 'AB'
+    config_params['use_gpu'] = torch.cuda.is_available()
     dump_yaml(config_path, config_params)   
 
 def get_exp_params():
@@ -60,6 +59,7 @@ def get_config():
     return config_params
 
 def save2config(key, val):
+    config_params = get_config()
     config_params[key] = val
     config_path = os.path.join(root_dir, 'config.yaml')
     dump_yaml(config_path, config_params)

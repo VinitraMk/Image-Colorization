@@ -3,7 +3,6 @@
 from torch.utils.data import Dataset
 import torch
 import os
-from dataloading.datareader import DataReader
 
 class CustomDataset(Dataset):
     
@@ -24,4 +23,6 @@ class CustomDataset(Dataset):
         
         if self.transform:
             sample = self.transform(sample)
+
+        return sample
         

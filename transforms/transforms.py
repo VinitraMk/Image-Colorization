@@ -98,12 +98,12 @@ class ToTensor(object):
         config = get_config()
         X_key, y_key = config['X_key'], config['y_key']
         image = sample[X_key]
-        image = image.transpose(2, 0, 1)
-        sample[X_key] = image
+        #image = image.transpose(2, 0, 1)
+        sample[X_key] = torch.from_numpy(image)
         if self.transform_y:
             image = sample[y_key]
-            image = image.transpose(2, 0, 1)
-            sample[y_key] = image
+            #image = image.transpose(2, 0, 1)
+            sample[y_key] = torch.from_numpy(image)
         return sample
             
             
