@@ -18,7 +18,6 @@ class DataReader:
     
     def get_split_data(self):
         data = np.load(os.path.join(self.data_dir, 'ae_data.npz'))
-        print('split data', data['ABtr'].shape, data['Ltr'].shape)
         return {
             'RGBtr': data['RGBtr'],
             'Ltr': np.expand_dims(data['Ltr'], 1),
