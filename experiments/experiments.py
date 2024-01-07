@@ -216,5 +216,4 @@ class Experiment:
         print("Loss:", running_loss/len(test_loader))
         print("Accuracy:", acc/len(test_loader), "\n")
         
-        
-        
+     

@@ -3,6 +3,8 @@ from PIL import Image
 import torch
 import os
 import yaml
+import json
+from datetime import datetime
 
 root_dir = ''
 config_params = {}
@@ -74,20 +76,51 @@ def get_error(y_pred, y_true):
     c = torch.sum(y_pred != y_true)
     return c / len(y_true)
 
-def save_model_chkpt(chkpt_info, chkpt_filename, best_model = False):
-    if best_model:
-        fpath = os.path.join(config_params['root_dir'], 'models/best-models')
+def save_model_chkpt(model, chkpt_info, chkpt_filename, is_checkpoint = True, best_model = False):
+    config_params = get_config()
+    if is_checkpoint:
+        fpath = os.path.join(config_params['root_dir'], 'models/checkpoints')
     else:
-        fpath = os.path.join(config_params['root_dir'], 'models/chkpoints')
+        if best_model:
+            fpath = os.path.join(config_params['output_dir'], 'experiment_results/best-models')
+        else:
+            fpath = os.path.join(config_params['output_dir'], 'experiment_results/checkpoints')
     
-    fpath = os.path.join(fpath, chkpt_filename)
-    with open(fpath, 'w') as fp:
-        torch.save(
-            chkpt_info,
-            fp
-        )
+    mpath = os.path.join(fpath, f'{chkpt_filename}.pt')
+    jpath = os.path.join(fpath, f'{chkpt_filename}.json')
+    torch.save(
+        model.state_dict(),
+        mpath
+    )
+    with open(jpath, 'w') as fp:
+        json.dump(chkpt_info, fp)
         
 def load_model(model_path):
     return torch.load(model_path)
 
+def get_modelinfo(json_path):
+    model_info = {}
+    with open(json_path, 'r') as fp:
+        model_info = json.load(fp)
+    return model_info
+
+def get_model_filename(model_name):
+    now = datetime.now()
+    nowstr = now.strftime("%d%m%Y%H%M%S")
+    fname = f'{model_name}_{nowstr}'
+    return fname
+
+def save_experiment_output(model, chkpt_info, exp_params, is_chkpoint,
+    model_type = 'best_model', save_as_best = False):
+    model_info = {
+        'experiment_params': exp_params,
+        'results': {
+            'valloss': chkpt_info[f'{model_type}_valloss'],
+            'valacc': chkpt_info[f'{model_type}_valacc'].item(),
+            'trlosshistory': chkpt_info[f'{model_type}_trlosshistory'].tolist(),
+            'vallosshistory': chkpt_info[f'{model_type}_vallosshistory'].tolist()
+        }
+    }
+    save_model_chkpt(model, model_info,
+        'current_model', is_chkpoint, save_as_best)
 

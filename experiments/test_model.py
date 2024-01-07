@@ -1,4 +1,4 @@
-from common.utils import get_exp_params, get_accuracy, get_config
+from common.utils import get_exp_params, get_accuracy, get_config, save_model_chkpt, get_model_filename, save_experiment_output
 from torch.utils.data import DataLoader
 import torch
 from matplotlib import pyplot as plt
@@ -6,7 +6,7 @@ from common import colorspaces
 
 class ModelTester:
 
-    def __init__(self, model, te_dataset):
+    def __init__(self, model, model_info, te_dataset):
         cfg = get_config()
         self.te_dataset = te_dataset
         self.model = model.cpu()
@@ -19,6 +19,7 @@ class ModelTester:
         self.output_dir = cfg['output_dir']
         self.X_key = cfg['X_key']
         self.y_key = cfg['y_key']
+        self.model_info = model_info
 
     def __loss_fn(self, loss_name = 'cross-entropy'):
         if loss_name == 'cross-entropy':
@@ -55,7 +56,7 @@ class ModelTester:
         plt.savefig(f'{self.output_dir}/test_results.png')
         plt.show()
    
-    def test_and_plot(self, RGB):
+    def test_and_plot(self, RGB, model_type = 'best_model', save_model_temporarily = False):
         loss_fn = self.__loss_fn(self.exp_params["train"]["loss"])
         running_loss = 0.0
         acc = 0
@@ -67,4 +68,5 @@ class ModelTester:
             self.__plot_predicted_images(batch[self.X_key], op, RGB)
         print("\nTest Loss:", running_loss/len(self.te_loader))
         print("Test Accuracy:", acc/len(self.te_loader), "\n")
+
         
