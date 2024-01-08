@@ -2,7 +2,7 @@ from common.utils import get_exp_params
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Subset
-from common.utils import get_accuracy, save_model_chkpt, get_config
+from common.utils import get_accuracy, save_model_chkpt, get_config, save_experiment_output
 
 class Experiment:
     
@@ -200,6 +200,10 @@ class Experiment:
             return model_info
         else:
             raise SystemExit("Error: no valid split method passed! Check run.yaml")
+
+    def save_model(self, model, chkpt_info, model_type, is_chkpt = True, is_best = True):
+        save_experiment_output(model, chkpt_info, self.exp_params,
+            is_chkpt, model_type, is_best)
         
     def test(self, model, test_dataset):
         model = model.cpu()

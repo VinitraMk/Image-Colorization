@@ -98,8 +98,16 @@ def save_model_chkpt(model, chkpt_info, chkpt_filename, is_checkpoint = True, be
 def load_model(model_path):
     return torch.load(model_path)
 
-def get_modelinfo(json_path):
+def get_modelinfo(json_filename, is_chkpt = True, is_best = False):
     model_info = {}
+    cfg = get_config()
+    if is_chkpt:
+        json_path = os.path.join(cfg["root_dir"], "models/checkpoints/current_model.json")
+    else:
+        if is_best:
+            json_path = os.path.join(cfg["output"], f"experiment_results/best_experiments/{json_filename}.json")
+        else:
+            json_path = os.path.join(cfg["output"], f"experiment_results/experiments/{json_filename}.json")
     with open(json_path, 'r') as fp:
         model_info = json.load(fp)
     return model_info
@@ -122,5 +130,18 @@ def save_experiment_output(model, chkpt_info, exp_params, is_chkpoint,
         }
     }
     save_model_chkpt(model, model_info,
-        'current_model', is_chkpoint, save_as_best)
+        f'current_model', is_chkpoint, save_as_best)
 
+def get_saved_model(model, model_filename, is_chkpt = True, is_best = False):
+    cfg = get_config()
+    if is_chkpt:
+        model_dict = load_model(os.path.join(cfg["root_dir"], "models/checkpoints/current_model.pt"))
+    else:
+        if is_best:
+            model_dict = load_model(os.path.join(cfg["output_dir"], f"experiment_results/best_experiments/{model_filename}.pt"))
+        else:
+            model_dict = load_model(os.path.join(cfg["output_dir"], f"experiment_results/experiments/{model_filename}.pt"))
+    model_state = model.state_dict()
+    for key in model_dict:
+        model_state[key] = model_dict[key]
+    return model

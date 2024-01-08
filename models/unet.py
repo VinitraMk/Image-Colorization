@@ -100,5 +100,3 @@ class UNet(nn.Module):
                 h = self.encoder(ip)
                 op = self.decoder(h)
                 return op
-
-

@@ -6,7 +6,7 @@ train:
     shuffle_data: True
     batch_size: 128
     val_split_method: 'k-fold'
-    k: 5
+    k: 10
     val_percentage: 20
     loss: 'mse'
     batch_interval: 512
