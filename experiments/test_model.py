@@ -1,3 +1,5 @@
+#script for testing the model
+
 from common.utils import get_exp_params, get_accuracy, get_config, save_model_chkpt, get_model_filename, save_experiment_output
 from torch.utils.data import DataLoader
 import torch

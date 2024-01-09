@@ -97,13 +97,13 @@ class ToTensor(object):
     def __call__(self, sample):
         config = get_config()
         X_key, y_key = config['X_key'], config['y_key']
-        image = sample[X_key]
-        #image = image.transpose(2, 0, 1)
-        sample[X_key] = torch.from_numpy(image)
+        image = torch.from_numpy(sample[X_key])
+        #image = image.permute((2, 0, 1))
+        sample[X_key] = image
         if self.transform_y:
-            image = sample[y_key]
-            #image = image.transpose(2, 0, 1)
-            sample[y_key] = torch.from_numpy(image)
+            image = torch.from_numpy(sample[y_key])
+            #image = image.permute((2, 0, 1))
+            sample[y_key] = image
         return sample
             
             

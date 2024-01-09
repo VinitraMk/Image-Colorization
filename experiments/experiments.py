@@ -34,7 +34,7 @@ class Experiment:
             raise SystemExit("Error: no valid loss function name passed! Check run.yaml")
         
     def __conduct_training(self, train_loader, val_loader):
-        loss_fn = self.__loss_fn()
+        loss_fn = self.__loss_fn().requires_grad_()
         tr_batch_num = len(train_loader)
         val_batch_num = len(val_loader)
         num_epochs = self.exp_params['train']['num_epochs']
@@ -54,8 +54,9 @@ class Experiment:
             running_loss = 0.0
             print("\t\tRunning through train dataset")
             for batch_idx, batch in enumerate(train_loader):
+                #print(batch[self.X_key].size(), self.X_key, self.y_key)
                 self.optimizer.zero_grad()
-                batch[self.X_key] = batch[self.X_key].to(self.device)
+                batch[self.X_key] = batch[self.X_key].float().to(self.device)
                 batch[self.y_key] = batch[self.y_key].to(self.device)
                 op = self.model(batch[self.X_key])
                 #print('compare', op.size(), batch[self.y_key].size())
@@ -72,18 +73,18 @@ class Experiment:
             self.model.eval()
             val_loss = 0.0
             val_acc = 0
-            for batch_idx, batch in enumerate(val_loader):
-                batch[self.X_key] = batch[self.X_key].to(self.device)
-                batch[self.y_key] = batch[self.y_key].to(self.device)
-                lop = self.model(batch[self.X_key])
-                loss = loss_fn(lop, batch[self.y_key])
-                loss.backward()
-                val_loss += loss.item()
-                val_acc += get_accuracy(lop, batch[self.y_key])
-                
-                if (batch_idx + 1) % batch_ivl == 0:
-                    print(f'\tBatch {batch_idx + 1} Last Model Loss: {val_loss / (batch_idx + 1)}')
-                    print(f'\tBatch {batch_idx + 1} Best Model Loss: {val_loss / (batch_idx + 1)}')
+            with torch.no_grad():
+                for batch_idx, batch in enumerate(val_loader):
+                    batch[self.X_key] = batch[self.X_key].float().to(self.device)
+                    batch[self.y_key] = batch[self.y_key].to(self.device)
+                    lop = self.model(batch[self.X_key])
+                    loss = loss_fn(lop, batch[self.y_key])
+                    val_loss += loss.item()
+                    val_acc += get_accuracy(lop, batch[self.y_key])
+                    
+                    if (batch_idx + 1) % batch_ivl == 0:
+                        print(f'\tBatch {batch_idx + 1} Last Model Loss: {val_loss / (batch_idx + 1)}')
+                        print(f'\tBatch {batch_idx + 1} Best Model Loss: {val_loss / (batch_idx + 1)}')
             val_loss /= val_batch_num
             val_acc /= val_batch_num
             val_loss_history.append(val_loss)
@@ -121,12 +122,15 @@ class Experiment:
         
         if self.exp_params['train']['val_split_method'] == 'k-fold':
             k = self.exp_params['train']['k']
-            vp = self.exp_params['train']['val_percentage']
+            vp = self.exp_params['train']['val_percentage'] / 100
             fl = len(self.ftr_dataset)
             fr = list(range(fl))
             vlen = int(vp * fl)
             vset_len = fl // k
             val_eei = list(range(vset_len, fl, vset_len))
+            le = val_eei[-1] + vset_len - 1
+            if le < fl:
+                val_eei.append(le + 1)
             si = 0
             bestm_acc = 0.0
             lastm_acc = 0.0
@@ -138,9 +142,9 @@ class Experiment:
             lastm_vlh = torch.zeros(self.exp_params['train']['num_epochs'])
 
             for ix, ei in enumerate(val_eei):
-                print(f"Running split {ix}")
+                print(f"Running split {ix} starting at {si} and ending with {ei}")
                 val_idxs = fr[si:ei]
-                tr_idxs = fr[ei:]
+                tr_idxs = [vi for vi in fr if vi not in val_idxs]
                 si = ei
                 train_dataset = Subset(self.ftr_dataset, tr_idxs)
                 val_dataset = Subset(self.ftr_dataset, val_idxs)
@@ -181,10 +185,10 @@ class Experiment:
             return model_info
         elif self.exp_params['train']['val_split_method'] == 'fix-split':
             print("Running straight split")
-            vp = self.exp_params['train']['val_percentage']
+            vp = self.exp_params['train']['val_percentage'] / 100
             vlen = int(vp * len(self.ftr_dataset))
             val_idxs = np.random.randint(0, len(self.ftr_dataset), vlen).tolist()
-            tr_idxs = [idx not in val_idxs for idx in range(len(self.fr_train_dataset))]
+            tr_idxs = [idx for idx in range(len(self.ftr_dataset)) if idx not in val_idxs]
             train_dataset = Subset(self.ftr_dataset, tr_idxs)
             val_dataset = Subset(self.ftr_dataset, val_idxs)
             
