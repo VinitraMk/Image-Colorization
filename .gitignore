@@ -6,4 +6,4 @@ data/**
 __pycache__/
 /**/__pycache__/
 config.yaml
-/models/checkpoints/*
+/models/checkpoints
