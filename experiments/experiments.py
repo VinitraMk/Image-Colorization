@@ -2,7 +2,10 @@ from common.utils import get_exp_params
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Subset
-from common.utils import get_accuracy, save_model_chkpt, get_config, save_experiment_output
+from common.utils import get_accuracy, save_model_chkpt, get_config, save_experiment_output, load_model, save_experiment_chkpt, load_modelpt
+from models.unet import UNet
+from models.custom_models import get_model
+import os
 
 class Experiment:
     
@@ -15,15 +18,17 @@ class Experiment:
             raise SystemExit("Error: no valid optimizer name passed! Check run.yaml file")
 
     
-    def __init__(self, model, ftr_dataset):
+    def __init__(self, model_name, ftr_dataset):
         self.exp_params = get_exp_params()
-        self.model = model
+        self.model_name = model_name
         self.optimizer = self.__get_optimizer(self.model, self.exp_params['model'], self.exp_params['model']['optimizer'])
         self.ftr_dataset = ftr_dataset
         cfg = get_config()
         self.X_key = cfg['X_key']
         self.y_key = cfg['y_key']
+        self.root_dir = cfg["root_dir"]
         self.device = 'cuda' if cfg['use_gpu'] else 'cpu'
+        self.all_folds_res = {}
         
     def __loss_fn(self, loss_name = 'cross-entropy'):
         if loss_name == 'cross-entropy':
@@ -32,166 +37,208 @@ class Experiment:
             return torch.nn.MSELoss()
         else:
             raise SystemExit("Error: no valid loss function name passed! Check run.yaml")
-        
-    def __conduct_training(self, train_loader, val_loader):
-        loss_fn = self.__loss_fn().requires_grad_()
+
+    def __conduct_training(self, model, fold_idx, epoch_index, train_loader, val_loader):
+        loss_fn = self.__loss_fn()
         tr_batch_num = len(train_loader)
         val_batch_num = len(val_loader)
         num_epochs = self.exp_params['train']['num_epochs']
         epoch_ivl = self.exp_params['train']['epoch_interval']
         batch_ivl = self.exp_params['train']['batch_interval']
-        best_loss = 99999
-        best_model = {}
-        best_model_trlosshistory = []
-        best_model_vallosshistory = []
-        tr_loss_history = []
-        val_loss_history = []
+        trlosshistory = []
+        vallosshistory = []
+        valacchistory = []
         tr_loss = 0.0
-        self.model = self.model.to(self.device)
-        for i in range(num_epochs):
-            self.model.train()
+        val_loss = 0.0
+        val_acc = 0.0
+        model = model.to(self.device).float()
+        model_info = {}
+        epoch_arr = list(range(epoch_index, num_epochs))
+        for i in epoch_arr:
             print(f'\tRunning Epoch {i}')
-            running_loss = 0.0
-            print("\t\tRunning through train dataset")
+            model.train()
+            tr_loss = 0.0
+            print(f'\t\tRunning through training dataset')
             for batch_idx, batch in enumerate(train_loader):
-                #print(batch[self.X_key].size(), self.X_key, self.y_key)
                 self.optimizer.zero_grad()
                 batch[self.X_key] = batch[self.X_key].float().to(self.device)
                 batch[self.y_key] = batch[self.y_key].to(self.device)
-                op = self.model(batch[self.X_key])
-                #print('compare', op.size(), batch[self.y_key].size())
+                op = model(batch[self.X_key])
                 loss = loss_fn(op, batch[self.y_key])
                 loss.backward()
                 self.optimizer.step()
-                running_loss += loss.item()
+                tr_loss += loss.item()
                 if (batch_idx + 1) % batch_ivl == 0:
-                    print(f'\t\tBatch {batch_idx + 1} Loss: {running_loss / (batch_idx + 1)}')
-            tr_loss = running_loss / tr_batch_num
-            tr_loss_history.append(tr_loss)
-            
-            print('\t\tRunning through validation dataset')
-            self.model.eval()
+                    print(f'\t\tBatch {batch_idx + 1} Loss: {tr_loss / (batch_idx + 1)}')
+            tr_loss /= tr_batch_num
+            trlosshistory.append(tr_loss)
+
+            print('\t\tRunning through validation set')
+            model.eval()
             val_loss = 0.0
-            val_acc = 0
+            val_acc = 0.0
             with torch.no_grad():
                 for batch_idx, batch in enumerate(val_loader):
                     batch[self.X_key] = batch[self.X_key].float().to(self.device)
                     batch[self.y_key] = batch[self.y_key].to(self.device)
-                    lop = self.model(batch[self.X_key])
+                    lop = model(batch[self.X_key])
                     loss = loss_fn(lop, batch[self.y_key])
+                    lop_lbls = torch.argmax(lop, 1)
                     val_loss += loss.item()
-                    val_acc += get_accuracy(lop, batch[self.y_key])
-                    
+                    val_acc += get_accuracy(lop_lbls, batch[self.y_key])
+    
                     if (batch_idx + 1) % batch_ivl == 0:
-                        print(f'\tBatch {batch_idx + 1} Last Model Loss: {val_loss / (batch_idx + 1)}')
-                        print(f'\tBatch {batch_idx + 1} Best Model Loss: {val_loss / (batch_idx + 1)}')
+                        print(f'\t\tBatch {batch_idx + 1} Last Model Loss: {val_loss / (batch_idx + 1)}')
+                        print(f'\t\tBatch {batch_idx + 1} Best Model Loss: {val_loss / (batch_idx + 1)}')
             val_loss /= val_batch_num
             val_acc /= val_batch_num
-            val_loss_history.append(val_loss)
-            if val_loss < best_loss:
-                best_loss = val_loss
-                best_model = self.model
-                best_acc = val_acc
-                best_model_trlosshistory = tr_loss_history
-                best_model_vallosshistory = val_loss_history
-            if i % epoch_ivl == 0:
-                print(f'\tEpoch {i} Training Loss: {tr_loss}')
-                print(f'\tEpoch {i} Validation Loss: {val_loss}')
-                print(f'\tEpoch {i} Validation Accuracy: {val_acc}\n')
-
+            vallosshistory.append(val_loss)
+            valacchistory.append(val_acc)
+            if (i+1) % epoch_ivl == 0:
+                print(f'Epoch {i} Training Loss: {tr_loss}')
+                print(f"Epoch {i} Validation Loss: {val_loss}")
+                print(f"Epoch {i} Validation Accuracy: {val_acc}\n")
+            model_info = {
+                'valloss': val_loss,
+                'valacc': val_acc,
+                'trloss': tr_loss,
+                'trlosshistory': torch.tensor(trlosshistory),
+                'vallosshistory': torch.tensor(vallosshistory),
+                'valacchistory': torch.tensor(valacchistory),
+                'fold': fold_idx,
+                'epoch': i
+            }
+            self.save_model_checkpoint(model.state_dict(), self.optimizer.state_dict(),
+            model_info, self.all_folds_res, 'last_state', True)
 
         model_info = {
-            'best_model': best_model.cpu() if best_model != {} else {},
-            'best_model_valloss': best_loss,
-            'best_model_valacc': best_acc,
-            'best_model_trlosshistory': torch.tensor(best_model_trlosshistory),
-            'best_model_vallosshistory': torch.tensor(best_model_vallosshistory),
-            'last_model': self.model.cpu(),
-            'last_model_valloss': val_loss,
-            'last_model_valacc': val_acc,
-            'last_model_trlosshistory': torch.tensor(tr_loss_history),
-            'last_model_vallosshistory': torch.tensor(val_loss_history)
+            'valloss': val_loss,
+            'valacc': val_acc,
+            'trloss': tr_loss,
+            'trlosshistory': torch.tensor(trlosshistory),
+            'vallosshistory': torch.tensor(vallosshistory),
+            'valacchistory': torch.tensor(valacchistory),
+            'fold': fold_idx,
+            'epoch': -1
         }
-                
-        return model_info
+        self.all_folds_res[fold_idx] = model_info
+        self.save_model_checkpoint(model.state_dict(), self.optimizer.state_dict(),
+        model_info, self.all_folds_res, 'last_state', True)
+        return model, model_info
 
-                
+    
+
+    def __get_experiment_chkpt(self, model):
+        mpath = os.path.join(self.root_dir, "models/checkpoints/current_model.pt")
+        if os.path.exists(mpath):
+            saved_model = load_modelpt(mpath)
+            model_state = model.state_dict()
+            model_dict = saved_model["model_state"]
+            for key in model_dict:
+                model_state[key] = model_dict[key]
+            self.all_folds_res = saved_model["model_history"]
+            self.optimizer.load_state_dict(saved_model['optimizer_state'])
+            return model, saved_model["last_state"], saved_model["best_state"]
+        else:
+            return model, None, None
+
     def train(self):
         train_loader = {}
         val_loader = {}
-        
+        model = get_model(self.model_name)
+        model, ls, bs = self.__get_experiment_chkpt(model)
+
         if self.exp_params['train']['val_split_method'] == 'k-fold':
             k = self.exp_params['train']['k']
-            vp = self.exp_params['train']['val_percentage'] / 100
-            fl = len(self.ftr_dataset)
+            fl = len(self.fr_train_dataset)
             fr = list(range(fl))
-            vlen = int(vp * fl)
-            vset_len = fl // k
-            val_eei = list(range(vset_len, fl, vset_len))
-            le = val_eei[-1] + vset_len - 1
-            if le < fl:
-                val_eei.append(le + 1)
-            si = 0
-            bestm_acc = 0.0
-            lastm_acc = 0.0
-            lastm_loss = 0.0
-            bestm_loss = 0.0
-            bestm_tlh = torch.zeros(self.exp_params['train']['num_epochs'])
-            bestm_vlh = torch.zeros(self.exp_params['train']['num_epochs'])
-            lastm_tlh = torch.zeros(self.exp_params['train']['num_epochs'])
-            lastm_vlh = torch.zeros(self.exp_params['train']['num_epochs'])
+            vlen = fl // k
 
-            for ix, ei in enumerate(val_eei):
-                print(f"Running split {ix} starting at {si} and ending with {ei}")
+            #get last model state if it exists
+            if ls == None:
+                vset_ei = fl // k
+                epoch_index = 0
+                val_eei = list(range(vset_ei, fl, vlen))
+                si = 0
+            elif ls['epoch'] == -1:
+                si = ls['fold'] + vlen
+                vset_ei = ls['fold'] + (2 * vlen)
+                epoch_idx = 0
+                val_eei = list(range(vset_ei, fl, vlen))
+                if val_eei[-1] == None or val_eei[-1] + vlen < fl:
+                    val_eei.append(val_eei[-1] + vlen)
+            else:
+                si = ls['fold']
+                vset_ei = ls['fold'] + vlen
+                epoch_idx = ls['epoch']
+                val_eei = list(range(vset_ei, fl, vlen))
+                if val_eei[-1] == None or val_eei[-1] + vlen < fl:
+                    val_eei.append(val_eei[-1] + vlen)
+
+            #get best model state if it exists
+            bestm_valacc = 0.0 if bs == None else bs['valacc']
+            bestm_valloss = 99999 if bs == None else bs['valloss']
+            bestm_trloss = 0.0 if bs == None else 0.0
+            bestm_tlh = torch.zeros(self.exp_params['train']['num_epochs']) if bs == None else bs['trlosshistory']
+            bestm_vlh = torch.zeros(self.exp_params['train']['num_epochs']) if bs == None else bs['vallosshistory']
+            bestm_vah = torch.zeros(self.exp_params['train']['num_epochs']) if bs == None else bs['valacchistory']
+            best_model = {} if bs == None else self.__build_model().load_state_dict(bs['model_state'])
+            best_fold = vset_ei
+            
+
+            for vi, ei in enumerate(val_eei):
+                print(f"Running split {vi} with si: {si} and ei: {ei}")
                 val_idxs = fr[si:ei]
-                tr_idxs = [vi for vi in fr if vi not in val_idxs]
-                si = ei
-                train_dataset = Subset(self.ftr_dataset, tr_idxs)
-                val_dataset = Subset(self.ftr_dataset, val_idxs)
-                
+                tr_idxs = [fi for fi in fr if fi not in val_idxs]
+                train_dataset = Subset(self.fr_train_dataset, tr_idxs)
+                val_dataset = Subset(self.fr_train_dataset, val_idxs)
+
                 train_loader = DataLoader(train_dataset,
                     batch_size = self.exp_params['train']['batch_size'],
-                    shuffle = self.exp_params['train']['shuffle_data']
+                    shuffle = False
                 )
                 val_loader = DataLoader(val_dataset,
                     batch_size = self.exp_params['train']['batch_size'],
-                    shuffle = self.exp_params['train']['shuffle_data']
+                    shuffle = False
                 )
-                model_info = self.__conduct_training(train_loader, val_loader)
-                bestm_acc += model_info['best_model_valacc']
-                bestm_loss += model_info['best_model_valloss']
-                bestm_tlh += model_info['best_model_trlosshistory']
-                bestm_vlh += model_info['best_model_vallosshistory']
-                lastm_acc += model_info['last_model_valacc']
-                lastm_loss += model_info['last_model_valloss']
-                lastm_tlh += model_info['last_model_trlosshistory']
-                lastm_vlh += model_info['last_model_vallosshistory']
-            bestm_loss/=k
-            bestm_acc/=k
-            bestm_tlh/=k
-            bestm_vlh/=k
-            lastm_loss/=k
-            lastm_acc/=k
-            lastm_tlh/=k
-            lastm_vlh/=k
-            model_info['best_model_valacc'] = bestm_acc
-            model_info['best_model_valloss'] = bestm_loss
-            model_info['best_model_trlosshistory'] = bestm_tlh
-            model_info['best_model_vallosshistory'] = bestm_vlh
-            model_info['last_model_valacc'] = lastm_acc
-            model_info['last_model_valloss'] = lastm_loss
-            model_info['last_model_trlosshistory'] = lastm_tlh
-            model_info['last_model_vallosshistory'] = lastm_vlh
-            return model_info
+                model, model_info = self.__conduct_training(model, si, train_loader, val_loader)
+                si = ei
+                self.all_folds_res[vi] = model_info
+                if model_info["valloss"] < bestm_valacc:
+                    best_model = model
+                    bestm_valloss = model_info["valloss"]
+                    bestm_valacc = model_info["valacc"]
+                    bestm_trloss = model_info["trloss"]
+                    bestm_vlh = model_info["vallosshistory"]
+                    bestm_tlh = model_info["trlosshistory"]
+                    bestm_vah = model_info["valacchistory"]
+                    best_fold = model_info["fold"]
+                model_info = {
+                    'model_state': best_model.state_dict(),
+                    'valloss': bestm_valloss,
+                    'trloss': bestm_trloss,
+                    'valacc': bestm_valacc,
+                    'trlosshistory': bestm_tlh,
+                    'vallosshistory': bestm_vlh,
+                    'valacchistory': bestm_vah,
+                    'fold': best_fold,
+                    'epoch': -1,
+                }
+                self.save_model_checkpoint(model.state_dict(), self.optimizer.state_dict(), model_info,
+                self.all_folds_res, 'best_state', True)
+            del model_info['fold']
+            del model_info['epoch']
+            self.save_model_checkpoint(best_model.state_dict(), None, model_info, None)
+            return self.all_folds_res
         elif self.exp_params['train']['val_split_method'] == 'fix-split':
             print("Running straight split")
             vp = self.exp_params['train']['val_percentage'] / 100
-            vlen = int(vp * len(self.ftr_dataset))
-            val_idxs = np.random.randint(0, len(self.ftr_dataset), vlen).tolist()
-            tr_idxs = [idx for idx in range(len(self.ftr_dataset)) if idx not in val_idxs]
-            train_dataset = Subset(self.ftr_dataset, tr_idxs)
-            val_dataset = Subset(self.ftr_dataset, val_idxs)
-            
+            vlen = int(vp * len(self.fr_train_dataset))
+            val_idxs = np.random.randint(0, len(self.fr_train_dataset), vlen).tolist()
+            tr_idxs = [idx not in val_idxs for idx in range(len(self.fr_train_dataset))]
+            train_dataset = Subset(self.fr_train_dataset, tr_idxs)
+            val_dataset = Subset(self.fr_train_dataset, val_idxs)
+
             train_loader = DataLoader(train_dataset,
                 batch_size = self.exp_params['train']['batch_size'],
                 shuffle = self.exp_params['train']['shuffle_data']
@@ -200,14 +247,22 @@ class Experiment:
                 batch_size = self.exp_params['train']['batch_size'],
                 shuffle = self.exp_params['train']['shuffle_data']
             )
-            model_info = self.__conduct_training(train_loader, val_loader)
-            return model_info
+            model, model_info = self.__conduct_training(model, -1, train_loader, val_loader)
+            del model_info['fold']
+            del model_info['epoch']
+            self.save_model_checkpoint(model.state_dict(), None, model_info, None)
+            return {}
         else:
             raise SystemExit("Error: no valid split method passed! Check run.yaml")
-
-    def save_model(self, model, chkpt_info, model_type, is_chkpt = True, is_best = True):
-        save_experiment_output(model, chkpt_info, self.exp_params,
-            is_chkpt, model_type, is_best)
+    
+    def save_model_checkpoint(self, model_state, optimizer_state, chkpt_info,
+    model_history = None, chkpt_type = 'last_state'):
+        if model_history == None:
+            save_experiment_output(model_state, chkpt_info, self.exp_params,
+                True, False)
+            os.remove(os.path.join(self.root_dir), "models/checkpoints/current_model.pt")
+        else:
+            save_model_chkpt(model_state, optimizer_state, chkpt_info, model_history, chkpt_type)
         
     def test(self, model, test_dataset):
         model = model.cpu()

@@ -76,33 +76,33 @@ def get_error(y_pred, y_true):
     c = torch.sum(y_pred != y_true)
     return c / len(y_true)
 
-def save_model_chkpt(model, chkpt_info, chkpt_filename, is_checkpoint = True, best_model = False):
+def save_model(model_state, chkpt_info, chkpt_filename = 'last_model', is_checkpoint = True, best_model = False):
     config_params = get_config()
     if is_checkpoint:
         fpath = os.path.join(config_params['root_dir'], 'models/checkpoints')
     else:
         if best_model:
-            fpath = os.path.join(config_params['output_dir'], 'experiment_results/best-models')
+            fpath = os.path.join(config_params['output_dir'], 'experiment_results/best_models')
         else:
             fpath = os.path.join(config_params['output_dir'], 'experiment_results/checkpoints')
     
     mpath = os.path.join(fpath, f'{chkpt_filename}.pt')
     jpath = os.path.join(fpath, f'{chkpt_filename}.json')
     torch.save(
-        model.state_dict(),
+        model_state,
         mpath
     )
     with open(jpath, 'w') as fp:
         json.dump(chkpt_info, fp)
         
-def load_model(model_path):
+def load_modelpt(model_path):
     return torch.load(model_path)
 
 def get_modelinfo(json_filename, is_chkpt = True, is_best = False):
     model_info = {}
     cfg = get_config()
     if is_chkpt:
-        json_path = os.path.join(cfg["root_dir"], "models/checkpoints/current_model.json")
+        json_path = os.path.join(cfg["root_dir"], "models/checkpoints/last_model.json")
     else:
         if is_best:
             json_path = os.path.join(cfg["output"], f"experiment_results/best_experiments/{json_filename}.json")
@@ -118,30 +118,49 @@ def get_model_filename(model_name):
     fname = f'{model_name}_{nowstr}'
     return fname
 
-def save_experiment_output(model, chkpt_info, exp_params, is_chkpoint,
-    model_type = 'best_model', save_as_best = False):
+def save_experiment_output(model_state, chkpt_info, exp_params, is_chkpoint = True, save_as_best = False):
     model_info = {
         'experiment_params': exp_params,
         'results': {
-            'valloss': chkpt_info[f'{model_type}_valloss'],
-            'valacc': chkpt_info[f'{model_type}_valacc'].item(),
-            'trlosshistory': chkpt_info[f'{model_type}_trlosshistory'].tolist(),
-            'vallosshistory': chkpt_info[f'{model_type}_vallosshistory'].tolist()
+            'valloss': chkpt_info['valloss'],
+            'trloss': chkpt_info['trloss'],
+            'valacc': chkpt_info['valacc'].item(),
+            'trlosshistory': chkpt_info['trlosshistory'].tolist(),
+            'vallosshistory': chkpt_info['vallosshistory'].tolist(),
+            'epoch': -1,
+            'fold': -1
         }
     }
-    save_model_chkpt(model, model_info,
-        f'current_model', is_chkpoint, save_as_best)
+    save_model(model_state, model_info,
+        f'last_model', is_chkpoint, save_as_best)
 
-def get_saved_model(model, model_filename, is_chkpt = True, is_best = False):
+def save_experiment_chkpt(model_state, optimizer_state, chkpt_info, model_history, chkpt_type = "last_state"):
+    cfg = get_config()
+    mpath = os.path.join(cfg["root_dir"], "models/checkpoints/current_model.pt")
+    if os.path.exists(mpath):
+        saved_model = load_modelpt(mpath)
+    else:
+        saved_model = {
+            "model_complete": False,
+            "model_history": model_history,
+            "best_state": None,
+            "last_state": None
+        }
+    saved_model[chkpt_type] = chkpt_info
+    saved_model["model_state"] = model_state #always the last state
+    saved_model["optimizer_state"] = optimizer_state #always the last state
+
+def get_saved_model(model, model_filename = '', is_chkpt = True, is_best = False):
     cfg = get_config()
     if is_chkpt:
-        model_dict = load_model(os.path.join(cfg["root_dir"], "models/checkpoints/current_model.pt"))
+        model_dict = load_modelpt(os.path.join(cfg["root_dir"], "models/checkpoints/last_model.pt"))
     else:
         if is_best:
-            model_dict = load_model(os.path.join(cfg["output_dir"], f"experiment_results/best_experiments/{model_filename}.pt"))
+            model_dict = load_modelpt(os.path.join(cfg["output_dir"], f"experiment_results/best_experiments/{model_filename}.pt"))
         else:
-            model_dict = load_model(os.path.join(cfg["output_dir"], f"experiment_results/experiments/{model_filename}.pt"))
+            model_dict = load_modelpt(os.path.join(cfg["output_dir"], f"experiment_results/experiments/{model_filename}.pt"))
     model_state = model.state_dict()
     for key in model_dict:
         model_state[key] = model_dict[key]
     return model
+

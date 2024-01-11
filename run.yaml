@@ -1,22 +1,21 @@
-# yaml file to run the scripts and model experiments
 transform:
     resize_dim: 256
     crop_dim: 224
 train:
     shuffle_data: True
-    batch_size: 128
+    batch_size: 256
     val_split_method: 'fix-split'
-    k: 5
+    k: 3
     val_percentage: 20
     loss: 'mse'
     batch_interval: 512
     epoch_interval: 1
-    num_epochs: 50
+    num_epochs: 2
 model:
     name: 'unet'
     optimizer: 'Adam'
-    lr: 0.001
-    weight_decay: 0.00000001
+    lr: 0.0001
+    weight_decay: 0.00001
     amsgrad: False
-    momentum: 0.9
+    momentum: 0.85
 test_model: False
