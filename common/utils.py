@@ -127,6 +127,7 @@ def save_experiment_output(model_state, chkpt_info, exp_params, is_chkpoint = Tr
             'valacc': chkpt_info['valacc'].item(),
             'trlosshistory': chkpt_info['trlosshistory'].tolist(),
             'vallosshistory': chkpt_info['vallosshistory'].tolist(),
+            'valacchistory': chkpt_info['valacchistory'].tolist(),
             'epoch': -1,
             'fold': -1
         }
@@ -149,6 +150,7 @@ def save_experiment_chkpt(model_state, optimizer_state, chkpt_info, model_histor
     saved_model[chkpt_type] = chkpt_info
     saved_model["model_state"] = model_state #always the last state
     saved_model["optimizer_state"] = optimizer_state #always the last state
+    torch.save(saved_model, mpath)
 
 def get_saved_model(model, model_filename = '', is_chkpt = True, is_best = False):
     cfg = get_config()

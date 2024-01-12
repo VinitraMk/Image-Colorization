@@ -1,6 +1,6 @@
 #script for testing the model
 
-from common.utils import get_exp_params, get_accuracy, get_config, save_model_chkpt, get_model_filename, save_experiment_output
+from common.utils import get_exp_params, get_accuracy, get_config, get_model_filename
 from torch.utils.data import DataLoader
 import torch
 from matplotlib import pyplot as plt

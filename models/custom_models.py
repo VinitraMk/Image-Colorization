@@ -2,7 +2,8 @@ from models.unet import UNet
 
 def get_model(model_name = 'unet'):
     model = {}
-    if model_name == "UNet":
+    if model_name == "unet":
         model = UNet()
     else:
-        SystemExit("Error: no valid model name passed! Check run.yaml")
+        raise SystemExit("Error: no valid model name passed! Check run.yaml")
+    return model
