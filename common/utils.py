@@ -50,6 +50,7 @@ def init_config():
     config_params['data_dir'] = data_dir
     config_params['output_dir'] = op_dir
     config_params['use_gpu'] = torch.cuda.is_available()
+    config_params['device'] = 'cuda' if torch.cuda.is_available() else 'cpu'
     dump_yaml(config_path, config_params)   
 
 def get_exp_params():
@@ -82,9 +83,9 @@ def save_model(model_state, chkpt_info, chkpt_filename = 'last_model', is_checkp
         fpath = os.path.join(config_params['root_dir'], 'models/checkpoints')
     else:
         if best_model:
-            fpath = os.path.join(config_params['output_dir'], 'experiment_results/best_models')
+            fpath = os.path.join(config_params['output_dir'], 'experiment_results/best_experiments')
         else:
-            fpath = os.path.join(config_params['output_dir'], 'experiment_results/checkpoints')
+            fpath = os.path.join(config_params['output_dir'], 'experiment_results/experiments')
     
     mpath = os.path.join(fpath, f'{chkpt_filename}.pt')
     jpath = os.path.join(fpath, f'{chkpt_filename}.json')
@@ -96,7 +97,8 @@ def save_model(model_state, chkpt_info, chkpt_filename = 'last_model', is_checkp
         json.dump(chkpt_info, fp)
         
 def load_modelpt(model_path):
-    return torch.load(model_path)
+    config_params = get_config()
+    return torch.load(model_path, map_location = torch.device(config_params["device"]))
 
 def get_modelinfo(json_filename, is_chkpt = True, is_best = False):
     model_info = {}
@@ -161,8 +163,71 @@ def get_saved_model(model, model_filename = '', is_chkpt = True, is_best = False
             model_dict = load_modelpt(os.path.join(cfg["output_dir"], f"experiment_results/best_experiments/{model_filename}.pt"))
         else:
             model_dict = load_modelpt(os.path.join(cfg["output_dir"], f"experiment_results/experiments/{model_filename}.pt"))
-    model_state = model.state_dict()
-    for key in model_dict:
-        model_state[key] = model_dict[key]
+    model.load_state_dict(model_dict)
     return model
 
+def save_model_helpers(model_history, optimizer_state, model_filename = '', is_chkpt = True, is_best = False):
+    cfg = get_config()
+    if is_chkpt:
+        mhpath = os.path.join(cfg["root_dir"], "models/checkpoints/last_model_history.pt")
+        opath = os.path.join(cfg["root_dir"], "models/checkpoints/last_model_optimizer.pt")
+    else:
+        if is_best:
+            mhpath = os.path.join(cfg["root_dir"], f"experiment_results/best_experiments/{model_filename}_history.pt")
+            opath = os.path.join(cfg["root_dir"], f"experiment_results/best_experiments/{model_filename}_optimizer.pt")
+        else:
+            mhpath = os.path.join(cfg["root_dir"], f"experiment_results/experiments/{model_filename}_history.pt")
+            opath = os.path.join(cfg["root_dir"], f"experiment_results/experiments/{model_filename}_optimizer.pt")
+
+    torch.save(model_history, mhpath)
+    torch.save(optimizer_state, opath)
+
+def get_model_data(mh_filename, is_chkpt = True, is_best = False):
+    cfg = get_config()
+    if is_chkpt:
+        mpath = os.path.join(cfg["root_dir"], "models/checkpoints/last_model.pt")
+        mhpath = os.path.join(cfg["root_dir"], "models/checkpoints/last_model_history.pt")
+        opath = os.path.join(cfg["root_dir"], "models/checkpoints/last_model_optimizer.pt")
+    else:
+        if is_best:
+            mpath = os.path.join(cfg["root_dir"], f"experiment_results/best_experiments/{mh_filename}.pt")
+            mhpath = os.path.join(cfg["root_dir"], f"experiment_results/best_experiments/{mh_filename}_history.pt")
+            opath = os.path.join(cfg["root_dir"], f"experiment_results/best_experiments/{mh_filename}_optimizer.pt")
+        else:
+            mpath = os.path.join(cfg["root_dir"], f"experiment_results/experiments/{mh_filename}.pt")
+            mhpath = os.path.join(cfg["root_dir"], f"experiment_results/experiments/{mh_filename}_history.pt")
+            opath = os.path.join(cfg["root_dir"], f"experiment_results/experiments/{mh_filename}_optimizer.pt")
+
+    return torch.load(mpath, map_location = torch.device(cfg["device"])),
+    torch.load(mhpath, map_location = torch.device(cfg["device"])),
+    torch.load(opath, map_location = torch.device(cfg["device"]))
+
+def convert_model2current(model, model_filename, is_chkpt = True, is_best = False):
+    saved_model_state, saved_model_history, saved_model_optimizer = get_model_data(model_filename, is_chkpt, is_best)
+    model_info = get_modelinfo(model_filename, is_chkpt, is_best)
+    prev_ep = model_info['experiment_params']
+    num_epochs = prev_ep['train']['num_epochs']
+
+    cfg = get_config()
+    mpath = os.path.join(cfg["root_dir"], "models/checkpoints/current_model.pt")
+    model_state = {
+        'trloss': model_info["results"]["trloss"],
+        'valloss':  model_info["results"]["valloss"],
+        'valacc': model_info["results"]["valacc"],
+        'trlosshistory': model_info['trlosshistory'].tolist(),
+        'vallosshistory': model_info['vallosshistory'].tolist(),
+        'valacchistory': model_info['valacchistory'].tolist(),
+        'epoch': num_epochs,
+        'fold': 0
+    }
+    new_curr = {
+        "model_complete": False,
+        "model_history": saved_model_history,
+        "best_state": model_state,
+        "last_state": model_state
+    }
+    new_curr['model_state'] = saved_model_state
+    new_curr['optimizer_state'] = saved_model_optimizer
+
+    torch.save(new_curr, "current_model.pt")
+    return new_curr
