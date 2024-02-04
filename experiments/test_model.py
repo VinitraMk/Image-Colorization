@@ -27,6 +27,8 @@ class ModelTester:
             return torch.nn.CrossEntropyLoss()
         elif loss_name == 'mse':
             return torch.nn.MSELoss()
+        elif loss_name == 'l1':
+            return torch.nn.L1Loss()
         else:
             raise SystemExit("Error: no valid loss function name passed! Check run.yaml")
 

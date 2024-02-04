@@ -10,12 +10,12 @@ train:
     loss: 'mse'
     batch_interval: 512
     epoch_interval: 1
-    num_epochs: 500
+    num_epochs: 50
 model:
     name: 'unet'
-    optimizer: 'Adam'
-    lr: 0.0001
-    weight_decay: 0.00001
+    optimizer: 'SGD'
+    lr: 0.00001
+    weight_decay: 0.000001
     amsgrad: False
-    momentum: 0.85
+    momentum: 0.9
 test_model: False

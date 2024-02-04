@@ -8,6 +8,10 @@ from random import shuffle
 from common.utils import get_accuracy, get_config, save_experiment_output, save_experiment_chkpt, load_modelpt, save_model_helpers
 from models.unet import UNet
 from models.custom_models import get_model
+from tqdm import tqdm
+import warnings
+
+warnings.filterwarnings("ignore")
 
 class Experiment:
 
@@ -20,7 +24,7 @@ class Experiment:
             raise SystemExit("Error: no valid optimizer name passed! Check run.yaml file")
 
 
-    def __init__(self, model_name, ftr_dataset):
+    def __init__(self, model_name, ftr_dataset, transforms = None):
         self.exp_params = get_exp_params()
         self.model_name = model_name
         self.ftr_dataset = ftr_dataset
@@ -30,12 +34,15 @@ class Experiment:
         self.root_dir = cfg["root_dir"]
         self.device = 'cuda' if cfg['use_gpu'] else 'cpu'
         self.all_folds_res = {}
+        self.data_transform = transforms
 
     def __loss_fn(self, loss_name = 'cross-entropy'):
         if loss_name == 'cross-entropy':
             return torch.nn.CrossEntropyLoss()
         elif loss_name == 'mse':
             return torch.nn.MSELoss()
+        elif loss_name == 'l1':
+            return torch.nn.L1Loss()
         else:
             raise SystemExit("Error: no valid loss function name passed! Check run.yaml")
 
@@ -56,10 +63,12 @@ class Experiment:
             print(f'\tRunning Epoch {i}')
             model.train()
             tr_loss = 0.0
-            print(f'\t\tRunning through training dataset')
-            for batch_idx, batch in enumerate(train_loader):
+            for batch_idx, batch in enumerate(tqdm(train_loader, desc = '\t\tRunning through training set', position = 0, leave = True)):
                 self.optimizer.zero_grad()
-                batch[self.X_key] = batch[self.X_key].float().to(self.device)
+                if self.data_transform:
+                    batch[self.X_key] = self.data_transform(batch[self.X_key]).float().to(self.device)
+                else:
+                    batch[self.X_key] = batch[self.X_key].float().to(self.device)
                 batch[self.y_key] = batch[self.y_key].to(self.device)
                 op = model(batch[self.X_key])
                 loss = loss_fn(op, batch[self.y_key])
@@ -72,13 +81,15 @@ class Experiment:
             tr_loss /= train_len
             trlosshistory.append(tr_loss)
 
-            print('\t\tRunning through validation set')
             model.eval()
             val_loss = 0.0
             val_acc = 0.0
             with torch.no_grad():
-                for batch_idx, batch in enumerate(val_loader):
-                    batch[self.X_key] = batch[self.X_key].float().to(self.device)
+                for batch_idx, batch in enumerate(tqdm(val_loader, desc = '\t\tRunning through validation set', position = 0, leave = True)):
+                    if self.data_transform:
+                        batch[self.X_key] = self.data_transform(batch[self.X_key]).float().to(self.device)
+                    else:
+                        batch[self.X_key] = batch[self.X_key].float().to(self.device)
                     batch[self.y_key] = batch[self.y_key].to(self.device)
                     lop = model(batch[self.X_key])
                     loss = loss_fn(lop, batch[self.y_key])
