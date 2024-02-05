@@ -10,7 +10,7 @@ train:
     loss: 'mse'
     batch_interval: 512
     epoch_interval: 1
-    num_epochs: 50
+    num_epochs: 1000
 model:
     name: 'unet'
     optimizer: 'SGD'
