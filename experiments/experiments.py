@@ -50,20 +50,22 @@ class Experiment:
                            train_loader, val_loader,
                            train_len, val_len,
                            trlosshistory = [], vallosshistory = [], valacchistory = []):
-        loss_fn = self.__loss_fn()
+        loss_fn = self.__loss_fn(self.exp_params['train']['loss'])
         num_epochs = self.exp_params['train']['num_epochs']
         epoch_ivl = self.exp_params['train']['epoch_interval']
-        batch_ivl = self.exp_params['train']['batch_interval']
         tr_loss = 0.0
         val_loss = 0.0
         val_acc = 0.0
         model_info = {}
         epoch_arr = list(range(epoch_index, num_epochs))
+        disable_tqdm_log = True
         for i in epoch_arr:
-            print(f'\tRunning Epoch {i}')
+            if (i + 1) % epoch_ivl == 0:
+                print(f'\tRunning Epoch {i+1}')
+                disable_tqdm_log = False
             model.train()
             tr_loss = 0.0
-            for batch_idx, batch in enumerate(tqdm(train_loader, desc = '\t\tRunning through training set', position = 0, leave = True)):
+            for batch_idx, batch in enumerate(tqdm(train_loader, desc = '\t\tRunning through training set', position = 0, leave = True, disable = disable_tqdm_log)):
                 self.optimizer.zero_grad()
                 if self.data_transform:
                     batch[self.X_key] = self.data_transform(batch[self.X_key]).float().to(self.device)
@@ -75,8 +77,6 @@ class Experiment:
                 loss.backward()
                 self.optimizer.step()
                 tr_loss += (loss.item() * batch[self.X_key].size()[0])
-                if (batch_idx + 1) % batch_ivl == 0:
-                    print(f'\t\tBatch {batch_idx + 1} Loss: {tr_loss / (batch_idx + 1)}')
                 torch.cuda.empty_cache()
             tr_loss /= train_len
             trlosshistory.append(tr_loss)
@@ -85,7 +85,7 @@ class Experiment:
             val_loss = 0.0
             val_acc = 0.0
             with torch.no_grad():
-                for batch_idx, batch in enumerate(tqdm(val_loader, desc = '\t\tRunning through validation set', position = 0, leave = True)):
+                for batch_idx, batch in enumerate(tqdm(val_loader, desc = '\t\tRunning through validation set', position = 0, leave = True, disable=disable_tqdm_log)):
                     if self.data_transform:
                         batch[self.X_key] = self.data_transform(batch[self.X_key]).float().to(self.device)
                     else:
@@ -96,9 +96,6 @@ class Experiment:
                     val_loss += (loss.item() * batch[self.y_key].size()[0])
                     val_acc += (get_accuracy(lop, batch[self.y_key]) * batch[self.y_key].size()[0])
 
-                    if (batch_idx + 1) % batch_ivl == 0:
-                        print(f'\t\tBatch {batch_idx + 1} Last Model Loss: {val_loss / (batch_idx + 1)}')
-                        print(f'\t\tBatch {batch_idx + 1} Best Model Loss: {val_loss / (batch_idx + 1)}')
                     torch.cuda.empty_cache()
             val_loss /= val_len
             val_acc /= val_len
@@ -120,6 +117,8 @@ class Experiment:
             }
             self.save_model_checkpoint(model.state_dict(), self.optimizer.state_dict(),
             self.all_folds_res, model_info, False, 'last_state')
+            disable_tqdm_log = True
+
 
         model_info = {
             'valloss': val_loss,

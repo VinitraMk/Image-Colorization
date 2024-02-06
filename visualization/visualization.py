@@ -53,5 +53,6 @@ class Visualization:
 
     def get_results(self):
         self.__plot_loss_history()
-        self.__get_performance_metrics()
+        if self.exp_params['train']['val_split_method'] == 'k-fold':
+            self.__get_performance_metrics()
 

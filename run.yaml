@@ -9,13 +9,13 @@ train:
     val_percentage: 20
     loss: 'mse'
     batch_interval: 512
-    epoch_interval: 1
-    num_epochs: 1000
+    epoch_interval: 50
+    num_epochs: 500
 model:
     name: 'unet'
-    optimizer: 'SGD'
-    lr: 0.00001
-    weight_decay: 0.000001
-    amsgrad: False
-    momentum: 0.9
+    optimizer: 'Adam'
+    lr: 0.00008
+    weight_decay: 0.0000001
+    amsgrad: True
+    momentum: 0.85
 test_model: False

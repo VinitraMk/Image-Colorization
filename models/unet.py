@@ -8,7 +8,7 @@ class Encoder(nn.Module):
         return nn.Sequential(
             nn.Conv2d(in_c, out_c, kernel_size = 5),
             nn.BatchNorm2d(out_c),
-            nn.LeakyReLU(),
+            nn.ReLU(),
             #nn.MaxPool2d(mp_size),
             #nn.Dropout(dp)
         )
@@ -19,7 +19,7 @@ class Encoder(nn.Module):
         self.block2 = self.__block(8, 16, 2)
         self.block3 = self.__block(16, 32, 2)
         self.block4 = self.__block(32, 64, 2)
-        self.block5 = self.__block(64, 128, 2)
+        #self.block5 = self.__block(64, 128, 2)
 
     def forward(self, x):
         #print('inp', x.size())
@@ -31,10 +31,10 @@ class Encoder(nn.Module):
         #print('h3', h3.size())
         h4 = self.block4(h3) #20 -> 16
         #print('h4', h4.size())
-        h5 = self.block5(h4)
+        #h5 = self.block5(h4)
         #print('h5', h5.size())
 
-        return [x, h1, h2, h3, h4, h5]
+        return [x, h1, h2, h3, h4]
 
 class Decoder(nn.Module):
 
@@ -42,31 +42,38 @@ class Decoder(nn.Module):
         return nn.Sequential(
             nn.Conv2d(in_channels = in_c, out_channels = out_c, kernel_size = 3, stride = 1, padding = 1, bias = False),
             nn.BatchNorm2d(out_c),
-            nn.LeakyReLU(),
+            nn.ReLU(),
             #nn.Dropout(p)
         )
 
     def __block(self, in_c, out_c, kernel_size, stride, padding, p = 0.2, out = False):
-        return nn.Sequential(
-            nn.ConvTranspose2d(in_c, out_c, kernel_size = kernel_size, stride = stride, padding = padding, bias = False),
-            nn.BatchNorm2d(out_c),
-            nn.LeakyReLU() if not out else nn.Sigmoid(),
-            #nn.Dropout(p) if not out else nn.Identity(),
-        )
+        if not(out):
+            return nn.Sequential(
+                nn.ConvTranspose2d(in_c, out_c, kernel_size = kernel_size, stride = stride, padding = padding, bias = False),
+                nn.BatchNorm2d(out_c),
+                nn.ReLU() if not out else nn.Sigmoid(),
+            )
+        else:
+            return nn.Sequential(
+                nn.ConvTranspose2d(in_c, out_c, kernel_size = kernel_size, stride = stride, padding = padding, bias = False),
+                nn.BatchNorm2d(out_c),
+                nn.ReLU() if not out else nn.Sigmoid(),
+                nn.Identity()
+            )
 
     def __init__(self):
         super().__init__()
-        self.block1 = self.__block(128, 64, 5, 1, 0)
-        self.block2 = self.__block(64, 32, 5, 1, 0)
-        self.block3 = self.__block(32, 16, 5, 1, 0)
-        self.block4 = self.__block(16, 8, 5, 1, 0)
-        self.block5 = self.__block(8, 2, 5, 1, 0, True)
+        #self.block1 = self.__block(128, 64, 5, 1, 0)
+        self.block1 = self.__block(64, 32, 5, 1, 0)
+        self.block2 = self.__block(32, 16, 5, 1, 0)
+        self.block3 = self.__block(16, 8, 5, 1, 0)
+        self.block4 = self.__block(8, 2, 5, 1, 0, True)
         #self.block6 = self.__block(4, 2, 5, 1, 0, True)
 
-        self.cb1 = self.__conv_block(128, 64)
-        self.cb2 = self.__conv_block(64, 32)
-        self.cb3 = self.__conv_block(32, 16)
-        self.cb4 = self.__conv_block(16, 8)
+        self.cb1 = self.__conv_block(64, 32)
+        self.cb2 = self.__conv_block(32, 16)
+        self.cb3 = self.__conv_block(16, 8)
+        #self.cb4 = self.__conv_block(16, 8)
         #self.cb5 = self.__conv_block(8, 4)
 
     def forward(self, h):
@@ -98,11 +105,11 @@ class Decoder(nn.Module):
         x = self.block4(x) #4 -> 1
         #print('o5', x.size())
 
-        x = torch.concat([x, h[-5]], dim = 1)
+        #x = torch.concat([x, h[-5]], dim = 1)
         #print('i4', x.size())
-        x = self.cb4(x)
+        #x = self.cb4(x)
         #print('o6', x.size())
-        x = self.block5(x)
+        #x = self.block5(x)
         #print('o7', x.size())
 
         ''' 

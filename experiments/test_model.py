@@ -36,33 +36,38 @@ class ModelTester:
         L = L.transpose(1, 3).transpose(1, 2)
         AB_pred = AB_pred.transpose(1, 3).transpose(1, 2)
         pred_LAB = torch.concat((L[:, :, :, :], AB_pred.detach()), dim = 3)
+        n = len(self.te_dataset)
         plt.clf()
-        plt.figure(figsize=(10,5))
-        for i in range(10):
-    
+        plt.figure(figsize=(n,5))
+        for i in range(n):
+            pos = i + 1
             #Plot true image
-            plt.subplot(5,10,i+1)
+            plt.subplot(5,n,pos)
             plt.imshow(RGB[i,:,:,:])
             plt.axis(False)
-    
+
+            pos = i + n + 1
             #Plot L channel
-            plt.subplot(5,10,i+11)
+            plt.subplot(5,n,pos)
             plt.imshow(L[i,:,:],cmap="gray")
             plt.axis(False)
-
+            
+            pos = i + (2 * n) + 1
             #Plot A channel
-            plt.subplot(5,10,i+21)
+            plt.subplot(5,n,pos)
             plt.imshow(AB_pred[i,:,:,0].detach())
             plt.axis(False)
 
+            pos = i + (3 * n) + 1
             #Plot B channel
-            plt.subplot(5,10,i+31)
+            plt.subplot(5,n,pos)
             plt.imshow(AB_pred[i,:,:,1].detach())
             plt.axis(False)
-    
+
+            pos = i + (4 * n) + 1 
             #Convert LAB prediction to RGB and plot
             pred_RGB = colorspaces.lab_to_rgb(pred_LAB[i,:,:,:])
-            plt.subplot(5,10,i+41)
+            plt.subplot(5,n,pos)
             plt.imshow(pred_RGB[0,:,:,:])
             plt.axis(False)
     
