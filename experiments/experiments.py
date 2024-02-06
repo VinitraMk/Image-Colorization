@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader, Subset
 import os
 from random import shuffle
 
-from common.utils import get_accuracy, get_config, save_experiment_output, save_experiment_chkpt, load_modelpt, save_model_helpers
+from common.utils import get_img_accuracy, get_config, save_experiment_output, save_experiment_chkpt, load_modelpt, save_model_helpers
 from models.unet import UNet
 from models.custom_models import get_model
 from tqdm import tqdm
@@ -94,8 +94,7 @@ class Experiment:
                     lop = model(batch[self.X_key])
                     loss = loss_fn(lop, batch[self.y_key])
                     val_loss += (loss.item() * batch[self.y_key].size()[0])
-                    val_acc += (get_accuracy(lop, batch[self.y_key]) * batch[self.y_key].size()[0])
-
+                    val_acc += (get_img_accuracy(lop, batch[self.y_key]) * batch[self.y_key].size()[0])
                     torch.cuda.empty_cache()
             val_loss /= val_len
             val_acc /= val_len
@@ -105,6 +104,7 @@ class Experiment:
                 print(f'\tEpoch {i} Training Loss: {tr_loss}')
                 print(f"\tEpoch {i} Validation Loss: {val_loss}")
                 print(f"\tEpoch {i} Validation Accuracy: {val_acc}\n")
+            
             model_info = {
                 'valloss': val_loss,
                 'valacc': val_acc,
@@ -118,7 +118,6 @@ class Experiment:
             self.save_model_checkpoint(model.state_dict(), self.optimizer.state_dict(),
             self.all_folds_res, model_info, False, 'last_state')
             disable_tqdm_log = True
-
 
         model_info = {
             'valloss': val_loss,
@@ -170,13 +169,11 @@ class Experiment:
 
             #get last model state if it exists
             if ls == None:
-                print('if')
                 vset_ei = fl // k
                 epoch_index = 0
                 val_eei = list(range(vset_ei, fl, vlen))
                 si = 0
             elif ls['epoch'] == -1:
-                print('elif')
                 si = ls['fold'] + vlen
                 vset_ei = ls['fold'] + (2 * vlen)
                 epoch_index = 0
@@ -184,7 +181,6 @@ class Experiment:
                 if val_eei[-1] == None or val_eei[-1] + vlen < fl:
                     val_eei.append(val_eei[-1] + vlen)
             else:
-                print('else')
                 si = ls['fold']
                 vset_ei = ls['fold'] + vlen
                 epoch_index = ls['epoch'] + 1

@@ -16,20 +16,20 @@ class Visualization:
     def __plot_loss_history(self):
         num_epochs = self.exp_params["train"]["num_epochs"]
         plt.clf()
-        print("\nBest model results\n\n")
+        print("\nModel results\n\n")
         plt.plot(list(range(num_epochs)), self.bestm_tlh, color="red", label="Best model training loss history")
         plt.plot(list(range(num_epochs)), self.bestm_vlh, color="orange", label="Best model validation loss history")
-        plt.title("Best model loss history")
+        plt.title("Model loss history")
         plt.legend()
         plt.show()
         print('\n\n\n')
         plt.plot(list(range(num_epochs)), self.bestm_vah, label = "Best model validation accuracy history")
-        plt.title("Best model validation accuracy history")
+        plt.title("Model validation accuracy history")
         plt.legend()
         plt.show()
-        print("\nBest Model Training Loss:", self.bestm_trloss)
-        print("Best Model Validation Loss:", self.bestm_valloss)
-        print(f"Best Model Accuracy: {self.bestm_valacc}\n")
+        print("\nModel Training Loss:", self.bestm_trloss)
+        print("Model Validation Loss:", self.bestm_valloss)
+        print(f"Model Accuracy: {self.bestm_valacc}\n")
 
     def __get_performance_metrics(self):
         k = self.exp_params['train']['k']

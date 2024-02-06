@@ -69,13 +69,32 @@ def save2config(key, val):
     config_path = os.path.join(root_dir, 'config.yaml')
     dump_yaml(config_path, config_params)
 
+def get_img_accuracy(y_pred, y_true):
+    cfg = get_config()
+    ndp = torch.prod(torch.tensor(y_true.size()[1:]))
+    e = torch.ones(y_true.size()[0]) * ndp
+    c = torch.sum(y_pred == y_true, (1,2,3))
+    e = e.to(cfg["device"])
+    ei = torch.sum(e == c)
+    return ei / y_true.size()[0]
+
 def get_accuracy(y_pred, y_true):
     c = torch.sum(y_pred == y_true)
-    return c / len(y_true)
+    return c / y_true.size()[0]
+
+def get_img_error(y_pred, y_true):
+    cfg = get_config()
+    ndp = torch.prod(torch.tensor(y_true.size()[1:]))
+    e = torch.ones(y_true.size()[0]) * ndp
+    e = e.to(cfg["device"])
+    c = torch.sum(y_pred != y_true, (1,2,3))
+    ei = torch.sum(e == c)
+    return ei / y_true.size()[0]
 
 def get_error(y_pred, y_true):
     c = torch.sum(y_pred != y_true)
-    return c / len(y_true)
+    l = y_true.size()[0]
+    return c / l
 
 def save_model(model_state, chkpt_info, chkpt_filename = 'last_model', is_checkpoint = True, best_model = False):
     config_params = get_config()

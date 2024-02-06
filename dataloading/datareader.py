@@ -24,7 +24,7 @@ class DataReader:
             'ABtr': np.transpose(data['ABtr'], (0, 3, 1, 2)),
             'RGBte': data['RGBte'],
             'Lte': np.expand_dims(data['Lte'], 1),
-            'ABte': np.transpose(data['ABtr'], (0, 3, 1, 2)),
+            'ABte': np.transpose(data['ABte'], (0, 3, 1, 2)),
             'ftr_len': data['RGBtr'].shape[0],
             'te_len': data['RGBte'].shape[0]
         }
