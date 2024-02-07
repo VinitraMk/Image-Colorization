@@ -101,9 +101,9 @@ class Experiment:
             vallosshistory.append(val_loss)
             valacchistory.append(val_acc)
             if (i+1) % epoch_ivl == 0:
-                print(f'\tEpoch {i} Training Loss: {tr_loss}')
-                print(f"\tEpoch {i} Validation Loss: {val_loss}")
-                print(f"\tEpoch {i} Validation Accuracy: {val_acc}\n")
+                print(f'\tEpoch {i+1} Training Loss: {tr_loss}')
+                print(f"\tEpoch {i+1} Validation Loss: {val_loss}")
+                print(f"\tEpoch {i+1} Validation Accuracy: {val_acc}\n")
             
             model_info = {
                 'valloss': val_loss,
