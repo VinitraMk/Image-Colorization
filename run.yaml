@@ -7,14 +7,13 @@ train:
     val_split_method: 'fixed-split'
     k: 3
     val_percentage: 20
-    loss: 'mse'
-    batch_interval: 512
-    epoch_interval: 100
-    num_epochs: 5000
+    loss: 'l1'
+    epoch_interval: 5
+    num_epochs: 200
 model:
-    name: 'unet'
+    name: 'conv_net'
     optimizer: 'Adam'
-    lr: 0.00008
+    lr: 0.0001
     weight_decay: 0.0000001
     amsgrad: True
     momentum: 0.85
