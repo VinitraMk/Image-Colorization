@@ -8,13 +8,13 @@ train:
     k: 3
     val_percentage: 20
     loss: 'l1'
-    epoch_interval: 5
-    num_epochs: 200
+    epoch_interval: 10
+    num_epochs: 100
 model:
     name: 'conv_net'
     optimizer: 'Adam'
-    lr: 0.0001
+    lr: 0.00008
     weight_decay: 0.0000001
     amsgrad: True
-    momentum: 0.85
+    momentum: 0.9
 test_model: False

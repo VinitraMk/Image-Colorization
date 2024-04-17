@@ -96,6 +96,12 @@ def get_error(y_pred, y_true):
     l = y_true.size()[0]
     return c / l
 
+def get_ssd(y_pred, y_true):
+    return torch.sum((y_pred - y_true)**2, (1, 2, 3))
+
+def get_mssd(y_pred, y_true):
+    return torch.mean((y_pred - y_true)**2, (1, 2, 3))
+
 def save_model(model_state, chkpt_info, chkpt_filename = 'last_model', is_checkpoint = True, best_model = False):
     config_params = get_config()
     if is_checkpoint:
@@ -145,10 +151,8 @@ def save_experiment_output(model_state, chkpt_info, exp_params, is_chkpoint = Tr
         'results': {
             'valloss': chkpt_info['valloss'],
             'trloss': chkpt_info['trloss'],
-            'valacc': chkpt_info['valacc'].item(),
             'trlosshistory': chkpt_info['trlosshistory'].tolist(),
             'vallosshistory': chkpt_info['vallosshistory'].tolist(),
-            'valacchistory': chkpt_info['valacchistory'].tolist(),
             'epoch': -1,
             'fold': -1
         }
@@ -233,10 +237,8 @@ def convert_model2current(model, model_filename, is_chkpt = True, is_best = Fals
     model_state = {
         'trloss': model_info["results"]["trloss"],
         'valloss':  model_info["results"]["valloss"],
-        'valacc': model_info["results"]["valacc"],
         'trlosshistory': model_info['trlosshistory'].tolist(),
         'vallosshistory': model_info['vallosshistory'].tolist(),
-        'valacchistory': model_info['valacchistory'].tolist(),
         'epoch': num_epochs,
         'fold': 0
     }

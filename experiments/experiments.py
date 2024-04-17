@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader, Subset
 import os
 from random import shuffle
 
-from common.utils import get_img_accuracy, get_config, save_experiment_output, save_experiment_chkpt, load_modelpt, save_model_helpers
+from common.utils import get_img_accuracy, get_config, save_experiment_output, save_experiment_chkpt, load_modelpt, save_model_helpers, get_mssd
 from models.unet import UNet
 from models.custom_models import get_model
 from tqdm import tqdm
@@ -49,18 +49,17 @@ class Experiment:
     def __conduct_training(self, model, fold_idx, epoch_index,
                            train_loader, val_loader,
                            train_len, val_len,
-                           trlosshistory = [], vallosshistory = [], valacchistory = []):
+                           trlosshistory = [], vallosshistory = [], valerrhistory = []):
         loss_fn = self.__loss_fn(self.exp_params['train']['loss'])
         num_epochs = self.exp_params['train']['num_epochs']
         epoch_ivl = self.exp_params['train']['epoch_interval']
         tr_loss = 0.0
         val_loss = 0.0
-        val_acc = 0.0
         model_info = {}
         epoch_arr = list(range(epoch_index, num_epochs))
         disable_tqdm_log = True
         for i in epoch_arr:
-            if (i + 1) % epoch_ivl == 0:
+            if ((i+1) % epoch_ivl == 0) or i == 0:
                 print(f'\tRunning Epoch {i+1}')
                 disable_tqdm_log = False
             model.train()
@@ -83,7 +82,6 @@ class Experiment:
 
             model.eval()
             val_loss = 0.0
-            val_acc = 0.0
             with torch.no_grad():
                 for batch_idx, batch in enumerate(tqdm(val_loader, desc = '\t\tRunning through validation set', position = 0, leave = True, disable=disable_tqdm_log)):
                     if self.data_transform:
@@ -94,24 +92,18 @@ class Experiment:
                     lop = model(batch[self.X_key])
                     loss = loss_fn(lop, batch[self.y_key])
                     val_loss += (loss.item() * batch[self.y_key].size()[0])
-                    val_acc += (get_img_accuracy(lop, batch[self.y_key]) * batch[self.y_key].size()[0])
                     torch.cuda.empty_cache()
             val_loss /= val_len
-            val_acc /= val_len
             vallosshistory.append(val_loss)
-            valacchistory.append(val_acc)
-            if (i+1) % epoch_ivl == 0:
+            if ((i+1) % epoch_ivl == 0) or i == 0:
                 print(f'\tEpoch {i+1} Training Loss: {tr_loss}')
                 print(f"\tEpoch {i+1} Validation Loss: {val_loss}")
-                print(f"\tEpoch {i+1} Validation Accuracy: {val_acc}\n")
-            
+
             model_info = {
                 'valloss': val_loss,
-                'valacc': val_acc,
                 'trloss': tr_loss,
                 'trlosshistory': torch.tensor(trlosshistory),
                 'vallosshistory': torch.tensor(vallosshistory),
-                'valacchistory': torch.tensor(valacchistory),
                 'fold': fold_idx,
                 'epoch': i
             }
@@ -121,11 +113,9 @@ class Experiment:
 
         model_info = {
             'valloss': val_loss,
-            'valacc': val_acc,
             'trloss': tr_loss,
             'trlosshistory': torch.tensor(trlosshistory),
             'vallosshistory': torch.tensor(vallosshistory),
-            'valacchistory': torch.tensor(valacchistory),
             'fold': fold_idx,
             'epoch': -1
         }
@@ -142,7 +132,7 @@ class Experiment:
             print("Loading saved model")
             saved_model = load_modelpt(mpath)
             model_dict = saved_model["model_state"]
-            model.load_state_dict(model_dict) 
+            model.load_state_dict(model_dict)
             self.all_folds_res = saved_model["model_history"]
             self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
             ops = saved_model['optimizer_state']
@@ -155,7 +145,7 @@ class Experiment:
     def train(self):
         train_loader = {}
         val_loader = {}
-        
+
 
         if self.exp_params['train']['val_split_method'] == 'k-fold':
             model = get_model(self.model_name)
@@ -189,12 +179,10 @@ class Experiment:
                     val_eei.append(val_eei[-1] + vlen)
 
             #get best model state if it exists
-            bestm_valacc = 0.0 if bs == None else bs['valacc']
             bestm_valloss = 99999 if bs == None else bs['valloss']
             bestm_trloss = 0.0 if bs == None else 0.0
             bestm_tlh = torch.zeros(self.exp_params['train']['num_epochs']) if bs == None else bs['trlosshistory']
             bestm_vlh = torch.zeros(self.exp_params['train']['num_epochs']) if bs == None else bs['vallosshistory']
-            bestm_vah = torch.zeros(self.exp_params['train']['num_epochs']) if bs == None else bs['valacchistory']
             best_model = {}
             best_optim = {}
             if bs != None:
@@ -212,7 +200,7 @@ class Experiment:
                 train_dataset = Subset(self.ftr_dataset, tr_idxs)
                 val_dataset = Subset(self.ftr_dataset, val_idxs)
                 tr_len = len(tr_idxs)
-                val_len = len(tr_idxs)
+                val_len = len(val_idxs)
 
                 train_loader = DataLoader(train_dataset,
                     batch_size = self.exp_params['train']['batch_size'],
@@ -226,7 +214,7 @@ class Experiment:
                     model, model_info = self.__conduct_training(model, si, epoch_index,
                         train_loader, val_loader,
                         tr_len, val_len,
-                        ls['trlosshistory'].tolist(), ls['vallosshistory'].tolist(), ls['valacchistory'].tolist())
+                        ls['trlosshistory'].tolist(), ls['vallosshistory'].tolist())
                 else:
                     model, model_info = self.__conduct_training(model, si, epoch_index,
                         train_loader, val_loader, tr_len, val_len)
@@ -236,20 +224,16 @@ class Experiment:
                     best_model = model
                     best_optim = self.optimizer
                     bestm_valloss = model_info["valloss"]
-                    bestm_valacc = model_info["valacc"]
                     bestm_trloss = model_info["trloss"]
                     bestm_vlh = model_info["vallosshistory"]
                     bestm_tlh = model_info["trlosshistory"]
-                    bestm_vah = model_info["valacchistory"]
                     best_fold = model_info["fold"]
                 model_info = {
                     'model_state': best_model.state_dict(),
                     'valloss': bestm_valloss,
                     'trloss': bestm_trloss,
-                    'valacc': bestm_valacc,
                     'trlosshistory': bestm_tlh,
                     'vallosshistory': bestm_vlh,
-                    'valacchistory': bestm_vah,
                     'fold': best_fold,
                     'epoch': -1,
                 }
@@ -289,7 +273,7 @@ class Experiment:
                 model, model_info = self.__conduct_training(model, -1, epoch_index,
                     train_loader, val_loader,
                     tr_len, val_len,
-                    ls['trlosshistory'].tolist(), ls['vallosshistory'].tolist(), ls['valacchistory'].tolist())
+                    ls['trlosshistory'].tolist(), ls['vallosshistory'].tolist())
             else:
                 model, model_info = self.__conduct_training(model, -1, epoch_index,
                     train_loader, val_loader, tr_len, val_len)
@@ -309,6 +293,5 @@ class Experiment:
             os.remove(os.path.join(self.root_dir, "models/checkpoints/current_model.pt"))
         else:
             save_experiment_chkpt(model_state, optimizer_state, chkpt_info, model_history, chkpt_type)
-
 
 
