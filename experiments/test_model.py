@@ -1,6 +1,6 @@
 #script for testing the model
 
-from common.utils import get_exp_params, get_accuracy, get_config, save_model_chkpt, get_model_filename, save_experiment_output
+from common.utils import get_exp_params, get_accuracy, get_config, get_model_filename
 from torch.utils.data import DataLoader
 import torch
 from matplotlib import pyplot as plt
@@ -27,47 +27,68 @@ class ModelTester:
             return torch.nn.CrossEntropyLoss()
         elif loss_name == 'mse':
             return torch.nn.MSELoss()
+        elif loss_name == 'l1':
+            return torch.nn.L1Loss()
         else:
             raise SystemExit("Error: no valid loss function name passed! Check run.yaml")
 
-    def __plot_predicted_images(self, L, AB_pred, RGB):
+    def __plot_predicted_images(self, L, AB_pred, RGB, AB):
         L = L.transpose(1, 3).transpose(1, 2)
+        AB = torch.from_numpy(AB)
+        AB = AB.transpose(1, 3).transpose(1, 2)
         AB_pred = AB_pred.transpose(1, 3).transpose(1, 2)
         pred_LAB = torch.concat((L[:, :, :, :], AB_pred.detach()), dim = 3)
+        n = len(self.te_dataset)
         plt.clf()
-        plt.figure(figsize=(10,5))
-        for i in range(10):
-    
+        plt.figure(figsize=(n,7))
+        for i in range(n):
+            pos = i + 1
             #Plot true image
-            plt.subplot(5,10,i+1)
+            plt.subplot(7,n,pos)
             plt.imshow(RGB[i,:,:,:])
             plt.axis(False)
-    
+
+            pos = i + n + 1
             #Plot L channel
-            plt.subplot(5,10,i+11)
+            plt.subplot(7,n,pos)
             plt.imshow(L[i,:,:],cmap="gray")
             plt.axis(False)
 
-            #Plot A channel
-            plt.subplot(5,10,i+21)
+            pos = i + (2 * n) + 1 
+            #Plot true A channel
+            plt.subplot(7, n, pos)
+            plt.imshow(AB[i,:,:, 0])
+            plt.axis(False)
+            
+            pos = i + (3 * n) + 1
+            #Plot predicted A channel 
+            plt.subplot(7,n,pos)
             plt.imshow(AB_pred[i,:,:,0].detach())
             plt.axis(False)
 
-            #Plot B channel
-            plt.subplot(5,10,i+31)
+            pos = i + (4 * n) + 1
+            #Plot true B channel
+            plt.subplot(7, n, pos)
+            plt.imshow(AB[i,:,:,1])
+            plt.axis(False)
+
+            pos = i + (5 * n) + 1
+            #Plot predicted B channel
+            plt.subplot(7,n,pos)
             plt.imshow(AB_pred[i,:,:,1].detach())
             plt.axis(False)
-    
+
+            pos = i + (6 * n) + 1 
             #Convert LAB prediction to RGB and plot
             pred_RGB = colorspaces.lab_to_rgb(pred_LAB[i,:,:,:])
-            plt.subplot(5,10,i+41)
+            plt.subplot(7,n,pos)
             plt.imshow(pred_RGB[0,:,:,:])
             plt.axis(False)
     
         plt.savefig(f'{self.output_dir}/test_results.png')
         plt.show()
    
-    def test_and_plot(self, RGB, model_type = 'best_model', save_model_temporarily = False):
+    def test_and_plot(self, RGB, ABtrue, model_type = 'best_model', save_model_temporarily = False):
         loss_fn = self.__loss_fn(self.exp_params["train"]["loss"])
         running_loss = 0.0
         acc = 0
@@ -76,7 +97,7 @@ class ModelTester:
             loss = loss_fn(op, batch[self.y_key])
             running_loss += loss.item()
             acc = get_accuracy(op, batch[self.y_key])
-            self.__plot_predicted_images(batch[self.X_key], op, RGB)
+            self.__plot_predicted_images(batch[self.X_key], op, RGB, ABtrue)
         print("\nTest Loss:", running_loss/len(self.te_loader))
         print("Test Accuracy:", acc/len(self.te_loader), "\n")
 
