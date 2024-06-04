@@ -3,6 +3,7 @@
 from torch.utils.data import Dataset
 import torch
 import os
+from torchvision.io import read_image
 
 class CustomDataset(Dataset):
     
@@ -25,4 +26,18 @@ class CustomDataset(Dataset):
             sample = self.transform(sample)
 
         return sample
+       
+       
+class CustomImagenetDataset(Dataset):
+    
+    def __init__(self, data_files):
+        self.data_files = data_files
         
+    def __len__(self):
+        return len(self.data_files)
+    
+    def __getitem__(self, idx):
+        rgb_tensor = read_image(self.data_files[idx]) 
+        sample = { 'RGB': rgb_tensor }
+        
+        return sample

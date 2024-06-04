@@ -8,8 +8,10 @@ from random import shuffle
 from common.utils import get_img_accuracy, get_config, save_experiment_output, save_experiment_chkpt, load_modelpt, save_model_helpers, get_mssd
 from models.unet import UNet
 from models.custom_models import get_model
+from common.colorspaces import rgb_to_lab
 from tqdm import tqdm
 import warnings
+import cv2
 
 warnings.filterwarnings("ignore")
 
@@ -24,7 +26,7 @@ class Experiment:
             raise SystemExit("Error: no valid optimizer name passed! Check run.yaml file")
 
 
-    def __init__(self, model_name, ftr_dataset, transforms = None):
+    def __init__(self, model_name, ftr_dataset, transforms = None, data_type = 'custom'):
         self.exp_params = get_exp_params()
         self.model_name = model_name
         self.ftr_dataset = ftr_dataset
@@ -35,6 +37,7 @@ class Experiment:
         self.device = 'cuda' if cfg['use_gpu'] else 'cpu'
         self.all_folds_res = {}
         self.data_transform = transforms
+        self.data_type = data_type
 
     def __loss_fn(self, loss_name = 'cross-entropy'):
         if loss_name == 'cross-entropy':
@@ -45,7 +48,25 @@ class Experiment:
             return torch.nn.L1Loss()
         else:
             raise SystemExit("Error: no valid loss function name passed! Check run.yaml")
-
+        
+    def __get_lab_images(self, batch_rgb):
+        L = np.empty((1, 320, 320))
+        AB = np.empty((1, 320, 320, 2))
+        for i in range(batch_rgb.shape[0]):
+            rgb_img = batch_rgb[i].transpose(0, 2).transpose(1, 2)
+            lab_img = rgb_to_lab(rgb_img)
+            rgb_np = rgb_img.numpy()
+            rgb_np = cv2.resize(rgb_np, (320, 320))
+            lab_np = lab_img.numpy()
+            lab_np = cv2.resize(lab_np, (320, 320))
+            l = lab_np[:, :, 0]
+            ab = lab_np[:, :, 1:]
+            L = np.append(L, l)
+            AB = np.append(AB, ab[None, :, :, :])
+        L = L[1:]
+        AB = AB[1:]
+        return L, AB
+            
     def __conduct_training(self, model, fold_idx, epoch_index,
                            train_loader, val_loader,
                            train_len, val_len,
@@ -66,6 +87,9 @@ class Experiment:
             tr_loss = 0.0
             for batch_idx, batch in enumerate(tqdm(train_loader, desc = '\t\tRunning through training set', position = 0, leave = True, disable = disable_tqdm_log)):
                 self.optimizer.zero_grad()
+                if self.data_type == 'imagenette':
+                    batch[self.X_key], batch[self.y_key] = self.__get_lab_images(batch['RGB'])
+                    
                 if self.data_transform:
                     batch[self.X_key] = self.data_transform(batch[self.X_key]).float().to(self.device)
                 else:
