@@ -33,6 +33,7 @@ for folder in test_folders:
 train_imgs = os.listdir(train_path)
 test_imgs = os.listdir(test_path)
 print('Start processing images...\n')
+'''
 for fl in tqdm(train_imgs, desc = 'Processing image folder'):
     #print(fl)
     fp = os.path.join(train_path, fl)
@@ -40,4 +41,11 @@ for fl in tqdm(train_imgs, desc = 'Processing image folder'):
     im = cv2.resize(im, (300,300))
     cv2.imwrite(fp, im)
     del im
-    
+''' 
+
+for fl in tqdm(test_imgs, desc = 'Processing image folder'):
+    fp = os.path.join(test_path, fl)
+    im = cv2.imread(fp)
+    im = cv2.resize(im, (300,300))
+    cv2.imwrite(fp, im)
+    del im
