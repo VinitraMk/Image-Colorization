@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import DataLoader, Subset
 import os
 from random import shuffle
+from torchvision import transforms
 
 from common.utils import get_img_accuracy, get_config, save_experiment_output, save_experiment_chkpt, load_modelpt, save_model_helpers, get_mssd
 from models.unet import UNet
@@ -48,21 +49,37 @@ class Experiment:
             return torch.nn.L1Loss()
         else:
             raise SystemExit("Error: no valid loss function name passed! Check run.yaml")
-        
+    
     def __get_lab_images(self, batch_rgb):
-        L = np.empty((1, 320, 320))
-        AB = np.empty((1, 320, 320, 2))
+        L = torch.empty((1, 1, 224, 224)) #np.empty((1, 224, 224))
+        AB = torch.empty((1, 2, 224, 224)) #np.empty((1, 224, 224, 2))
+        inv_transform = transforms.Compose([ transforms.Normalize(mean = [ 0., 0., 0. ],
+                                                     std = [ 1/0.229, 1/0.224, 1/0.225 ]),
+                                transforms.Normalize(mean = [ -0.485, -0.456, -0.406 ],
+                                                     std = [ 1., 1., 1. ]),
+                               ])
         for i in range(batch_rgb.shape[0]):
-            rgb_img = batch_rgb[i].transpose(0, 2).transpose(1, 2)
+            #rgb_img = batch_rgb[i].transpose(0, 2).transpose(0, 1).float()
+            rgb_img = batch_rgb[i].float()
+            if self.data_transform:
+                #print('b4 transform', rgb_img.size())
+                rgb_img = self.data_transform(rgb_img)
+                #print('after transform', rgb_img.size())
+            rgb_img = inv_transform(rgb_img) 
+            rgb_img = rgb_img.transpose(0, 2).transpose(0, 1)
+            #rgb_img = rgb_img[None, :, :, :]
+            #print('after transpose', rgb_img.size())
             lab_img = rgb_to_lab(rgb_img)
-            rgb_np = rgb_img.numpy()
-            rgb_np = cv2.resize(rgb_np, (320, 320))
-            lab_np = lab_img.numpy()
-            lab_np = cv2.resize(lab_np, (320, 320))
-            l = lab_np[:, :, 0]
-            ab = lab_np[:, :, 1:]
-            L = np.append(L, l)
-            AB = np.append(AB, ab[None, :, :, :])
+            #rgb_np = rgb_img.numpy()
+            #lab_np = lab_img.numpy()
+            #print('after lab', lab_img.size())
+            lab_img = lab_img.transpose(3, 1).transpose(3, 2)
+            #print('lab img sz', lab_img.size())
+            l = lab_img[:, 0, :, :]
+            ab = lab_img[:, 1:, :, :]
+            #print(l.size(), ab.size())
+            L = torch.cat((L, l[:, None, :, :]), axis=0) #np.append(L, l, axis=0)
+            AB = torch.cat((AB, ab), axis=0)  #np.append(AB, ab, axis=0)
         L = L[1:]
         AB = AB[1:]
         return L, AB
@@ -87,20 +104,18 @@ class Experiment:
             tr_loss = 0.0
             for batch_idx, batch in enumerate(tqdm(train_loader, desc = '\t\tRunning through training set', position = 0, leave = True, disable = disable_tqdm_log)):
                 self.optimizer.zero_grad()
+                #print('batch sz', batch['RGB'].size())
                 if self.data_type == 'imagenette':
                     batch[self.X_key], batch[self.y_key] = self.__get_lab_images(batch['RGB'])
-                    
-                if self.data_transform:
-                    batch[self.X_key] = self.data_transform(batch[self.X_key]).float().to(self.device)
-                else:
-                    batch[self.X_key] = batch[self.X_key].float().to(self.device)
-                batch[self.y_key] = batch[self.y_key].to(self.device)
+                #print('before data transform: ', batch[self.X_key].shape, batch[self.y_key].shape) 
+                batch[self.X_key] = batch[self.X_key].float().to(self.device)
+                batch[self.y_key] = batch[self.y_key].float().to(self.device)
                 op = model(batch[self.X_key])
                 loss = loss_fn(op, batch[self.y_key])
                 loss.backward()
                 self.optimizer.step()
                 tr_loss += (loss.item() * batch[self.X_key].size()[0])
-                torch.cuda.empty_cache()
+                #torch.cuda.empty_cache()
             tr_loss /= train_len
             trlosshistory.append(tr_loss)
 
@@ -108,15 +123,14 @@ class Experiment:
             val_loss = 0.0
             with torch.no_grad():
                 for batch_idx, batch in enumerate(tqdm(val_loader, desc = '\t\tRunning through validation set', position = 0, leave = True, disable=disable_tqdm_log)):
-                    if self.data_transform:
-                        batch[self.X_key] = self.data_transform(batch[self.X_key]).float().to(self.device)
-                    else:
-                        batch[self.X_key] = batch[self.X_key].float().to(self.device)
-                    batch[self.y_key] = batch[self.y_key].to(self.device)
+                    if self.data_type == 'imagenette':
+                        batch[self.X_key], batch[self.y_key] = self.__get_lab_images(batch['RGB'])
+                    batch[self.X_key] = batch[self.X_key].float().to(self.device)
+                    batch[self.y_key] = batch[self.y_key].float().to(self.device)
                     lop = model(batch[self.X_key])
                     loss = loss_fn(lop, batch[self.y_key])
                     val_loss += (loss.item() * batch[self.y_key].size()[0])
-                    torch.cuda.empty_cache()
+                    #torch.cuda.empty_cache()
             val_loss /= val_len
             vallosshistory.append(val_loss)
             if ((i+1) % epoch_ivl == 0) or i == 0:
