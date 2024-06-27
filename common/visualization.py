@@ -6,9 +6,10 @@ class Visualization:
     def __init__(self, model_info, model_history = {}):
         self.bestm_valloss = model_info['results']['valloss']
         self.bestm_trloss = model_info['results']['trloss']
-        self.bestm_tlh = model_info['results']['trlosshistory']
-        self.bestm_vlh = model_info['results']['vallosshistory']
         self.exp_params = get_exp_params()
+        num_epochs = self.exp_params['train']['num_epochs']
+        self.bestm_tlh = model_info['results']['trlosshistory'][-num_epochs:]
+        self.bestm_vlh = model_info['results']['vallosshistory'][-num_epochs:]
         self.model_history = model_history if model_history != {} else None
 
     def __plot_loss_history(self):

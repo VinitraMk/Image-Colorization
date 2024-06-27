@@ -11,7 +11,7 @@ from torchvision import transforms
 
 class ModelTester:
 
-    def __init__(self, model, te_dataset, data_transform = None, result_sample_len = 10):
+    def __init__(self, model, te_dataset, data_transform = None, result_sample_len = 5):
         cfg = get_config()
         self.te_dataset = te_dataset
         self.model = model.cpu()
@@ -59,7 +59,8 @@ class ModelTester:
             pos = i + n + 1
             #Plot L channel
             plt.subplot(7,n,pos)
-            plt.imshow(L[i,:,:],cmap="gray")
+            #print(L[i].min(), L[i].max())
+            plt.imshow(L[i,:,:], cmap='gray')
             plt.axis(False)
 
             pos = i + (2 * n) + 1
@@ -110,6 +111,7 @@ class ModelTester:
         for i in range(batch_rgb.shape[0]):
             #rgb_img = batch_rgb[i].transpose(0, 2).transpose(0, 1).float()
             rgb_img = batch_rgb[i].float()
+            #print('rgb', rgb_img.min(), rgb_img.max())
             if self.data_transform:
                 rgb_img = self.data_transform(rgb_img)
             rgb_img = inv_transform(rgb_img)
@@ -144,8 +146,6 @@ class ModelTester:
 
         for batch_idx, batch in enumerate(self.te_loader):
             batch[self.X_key], batch[self.y_key] = self.__get_lab_images(batch['RGB'])
-            #batch[self.X_key] = batch[self.X_key].float()
-            #batch[self.y_key] = batch[self.y_key].float()
             op = self.model(batch[self.X_key])
             loss = loss_fn(op, batch[self.y_key])
             running_loss += loss.item()
@@ -153,7 +153,9 @@ class ModelTester:
             RGB = batch['RGB'].transpose(1, 3).transpose(1, 2)
             if batch_idx == 0:
                 self.__plot_predicted_images(batch[self.X_key], op, RGB, batch[self.y_key])
+            del RGB
         print("\nTest Loss:", running_loss/len(self.te_loader))
         print("Test Accuracy:", acc/len(self.te_loader), "\n")
+
 
 

@@ -220,6 +220,7 @@ class Experiment:
             del model_info['fold']
             del model_info['epoch']
             self.save_model_checkpoint(model.state_dict(), self.optimizer.state_dict(), self.all_folds_res, model_info, True)
+            torch.cuda.empty_cache()
             return {}
         else:
             raise SystemExit("Error: no valid split method passed! Check run.yaml")
