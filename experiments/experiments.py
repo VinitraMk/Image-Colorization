@@ -161,9 +161,7 @@ class Experiment:
         self.save_model_checkpoint(model.state_dict(), self.optimizer.state_dict(),
         self.all_folds_res, model_info, False)
         return model, model_info
-
-
-
+    
     def __get_experiment_chkpt(self, model):
         mpath = os.path.join(self.root_dir, "models/checkpoints/current_model.pt")
         if os.path.exists(mpath):
@@ -177,7 +175,17 @@ class Experiment:
             self.optimizer.load_state_dict(ops)
             return model, saved_model["last_state"], saved_model["best_state"]
         else:
-            self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
+            if self.exp_params['model']['build_on_pretrained']:
+                # do something
+                print("Loading the given pretrained model")
+                mpath = os.path.join(self.root_dir, self.exp_params['model']['pretrained_filename'])
+                saved_model = load_modelpt(mpath)
+                model_dict = saved_model["model_state"]
+                model.load_state_dict(model_dict)
+                self.all_folds_res = saved_model["model_history"]
+                self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
+            else:
+                self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
             return model, None, None
 
     def train(self):

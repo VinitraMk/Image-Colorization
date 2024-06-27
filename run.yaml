@@ -17,8 +17,9 @@ model:
     weight_decay: 0.0000001
     amsgrad: True
     momentum: 0.8
+    build_on_pretrained: False
+    pretrained_filename: '/models/checkpoints/last_model.pt'
 dataset:
     name: 'imagenette'
     size: 'subset'
-test_model: False
 
