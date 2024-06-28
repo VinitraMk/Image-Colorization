@@ -9,7 +9,7 @@ train:
     val_percentage: 20
     loss: 'l1'
     epoch_interval: 10
-    num_epochs: 1000
+    num_epochs: 10
 model:
     name: 'conv_net'
     optimizer: 'Adam'
