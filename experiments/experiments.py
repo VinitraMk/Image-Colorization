@@ -96,8 +96,8 @@ class Experiment:
         model_info = {}
         epoch_arr = list(range(epoch_index, num_epochs))
         disable_tqdm_log = True
-        for i in epoch_arr:
-            if ((i+1) % epoch_ivl == 0) or i == 0:
+        for epoch_i,i in enumerate(epoch_arr):
+            if ((i+1) % epoch_ivl == 0) or epoch_i == 0:
                 print(f'\tRunning Epoch {i+1}')
                 disable_tqdm_log = False
             model.train()
@@ -133,7 +133,7 @@ class Experiment:
                     #torch.cuda.empty_cache()
             val_loss /= val_len
             vallosshistory.append(val_loss)
-            if ((i+1) % epoch_ivl == 0) or i == 0:
+            if ((i+1) % epoch_ivl == 0) or epoch_i == 0:
                 print(f'\tEpoch {i+1} Training Loss: {tr_loss}')
                 print(f"\tEpoch {i+1} Validation Loss: {val_loss}")
 
