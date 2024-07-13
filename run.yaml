@@ -8,7 +8,7 @@ train:
     k: 3
     val_percentage: 20
     loss: 'l1'
-    epoch_interval: 10
+    epoch_interval: 5
     num_epochs: 1500
 model:
     name: 'conv_net'
