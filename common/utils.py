@@ -102,15 +102,12 @@ def get_ssd(y_pred, y_true):
 def get_mssd(y_pred, y_true):
     return torch.mean((y_pred - y_true)**2, (1, 2, 3))
 
-def save_model(model_state, chkpt_info, chkpt_filename = 'last_model', is_checkpoint = True, best_model = False):
+def save_model(model_state, chkpt_info, chkpt_filename = 'last_model', is_checkpoint = True):
     config_params = get_config()
     if is_checkpoint:
         fpath = os.path.join(config_params['root_dir'], 'models/checkpoints')
     else:
-        if best_model:
-            fpath = os.path.join(config_params['output_dir'], 'experiment_results/best_experiments')
-        else:
-            fpath = os.path.join(config_params['output_dir'], 'experiment_results/experiments')
+        fpath = os.path.join(config_params['output_dir'], 'experiment_results/experiments')
     
     mpath = os.path.join(fpath, f'{chkpt_filename}.pt')
     jpath = os.path.join(fpath, f'{chkpt_filename}.json')
@@ -125,16 +122,13 @@ def load_modelpt(model_path):
     config_params = get_config()
     return torch.load(model_path, map_location = torch.device(config_params["device"]))
 
-def get_modelinfo(json_filename, is_chkpt = True, is_best = False):
+def get_modelinfo(json_filename, is_chkpt = True):
     model_info = {}
     cfg = get_config()
     if is_chkpt:
         json_path = os.path.join(cfg["root_dir"], "models/checkpoints/last_model.json")
     else:
-        if is_best:
-            json_path = os.path.join(cfg["output"], f"experiment_results/best_experiments/{json_filename}.json")
-        else:
-            json_path = os.path.join(cfg["output"], f"experiment_results/experiments/{json_filename}.json")
+        json_path = os.path.join(cfg["output"], f"experiment_results/experiments/{json_filename}.json")
     with open(json_path, 'r') as fp:
         model_info = json.load(fp)
     return model_info
@@ -145,7 +139,7 @@ def get_model_filename(model_name):
     fname = f'{model_name}_{nowstr}'
     return fname
 
-def save_experiment_output(model_state, chkpt_info, exp_params, is_chkpoint = True, save_as_best = False):
+def save_experiment_output(model_state, chkpt_info, exp_params, is_chkpoint = True):
     model_info = {
         'experiment_params': exp_params,
         'results': {
@@ -158,9 +152,9 @@ def save_experiment_output(model_state, chkpt_info, exp_params, is_chkpoint = Tr
         }
     }
     save_model(model_state, model_info,
-        f'last_model', is_chkpoint, save_as_best)
+        f'last_model', is_chkpoint)
 
-def save_experiment_chkpt(model_state, optimizer_state, chkpt_info, model_history, chkpt_type = "last_state"):
+def save_experiment_chkpt(model_state, optimizer_state, chkpt_info, model_history):
     cfg = get_config()
     mpath = os.path.join(cfg["root_dir"], "models/checkpoints/current_model.pt")
     if os.path.exists(mpath):
@@ -169,57 +163,44 @@ def save_experiment_chkpt(model_state, optimizer_state, chkpt_info, model_histor
         saved_model = {
             "model_complete": False,
             "model_history": model_history,
-            "best_state": None,
             "last_state": None
         }
-    saved_model[chkpt_type] = chkpt_info
+    saved_model['last_state'] = chkpt_info
     saved_model["model_state"] = model_state #always the last state
     saved_model["optimizer_state"] = optimizer_state #always the last state
     torch.save(saved_model, mpath)
 
-def get_saved_model(model, model_filename = '', is_chkpt = True, is_best = False):
+def get_saved_model(model, model_filename = '', is_chkpt = True):
     cfg = get_config()
     if is_chkpt:
         model_dict = load_modelpt(os.path.join(cfg["root_dir"], "models/checkpoints/last_model.pt"))
     else:
-        if is_best:
-            model_dict = load_modelpt(os.path.join(cfg["output_dir"], f"experiment_results/best_experiments/{model_filename}.pt"))
-        else:
-            model_dict = load_modelpt(os.path.join(cfg["output_dir"], f"experiment_results/experiments/{model_filename}.pt"))
+        model_dict = load_modelpt(os.path.join(cfg["output_dir"], f"experiment_results/experiments/{model_filename}.pt"))
     model.load_state_dict(model_dict)
     return model
 
-def save_model_helpers(model_history, optimizer_state, model_filename = '', is_chkpt = True, is_best = False):
+def save_model_helpers(model_history, optimizer_state, model_filename = '', is_chkpt = True):
     cfg = get_config()
     if is_chkpt:
         mhpath = os.path.join(cfg["root_dir"], "models/checkpoints/last_model_history.pt")
         opath = os.path.join(cfg["root_dir"], "models/checkpoints/last_model_optimizer.pt")
     else:
-        if is_best:
-            mhpath = os.path.join(cfg["root_dir"], f"experiment_results/best_experiments/{model_filename}_history.pt")
-            opath = os.path.join(cfg["root_dir"], f"experiment_results/best_experiments/{model_filename}_optimizer.pt")
-        else:
-            mhpath = os.path.join(cfg["root_dir"], f"experiment_results/experiments/{model_filename}_history.pt")
-            opath = os.path.join(cfg["root_dir"], f"experiment_results/experiments/{model_filename}_optimizer.pt")
+        mhpath = os.path.join(cfg["root_dir"], f"experiment_results/experiments/{model_filename}_history.pt")
+        opath = os.path.join(cfg["root_dir"], f"experiment_results/experiments/{model_filename}_optimizer.pt")
 
     torch.save(model_history, mhpath)
     torch.save(optimizer_state, opath)
 
-def get_model_data(mh_filename, is_chkpt = True, is_best = False):
+def get_model_data(mh_filename, is_chkpt = True):
     cfg = get_config()
     if is_chkpt:
         mpath = os.path.join(cfg["root_dir"], "models/checkpoints/last_model.pt")
         mhpath = os.path.join(cfg["root_dir"], "models/checkpoints/last_model_history.pt")
         opath = os.path.join(cfg["root_dir"], "models/checkpoints/last_model_optimizer.pt")
     else:
-        if is_best:
-            mpath = os.path.join(cfg["root_dir"], f"experiment_results/best_experiments/{mh_filename}.pt")
-            mhpath = os.path.join(cfg["root_dir"], f"experiment_results/best_experiments/{mh_filename}_history.pt")
-            opath = os.path.join(cfg["root_dir"], f"experiment_results/best_experiments/{mh_filename}_optimizer.pt")
-        else:
-            mpath = os.path.join(cfg["root_dir"], f"experiment_results/experiments/{mh_filename}.pt")
-            mhpath = os.path.join(cfg["root_dir"], f"experiment_results/experiments/{mh_filename}_history.pt")
-            opath = os.path.join(cfg["root_dir"], f"experiment_results/experiments/{mh_filename}_optimizer.pt")
+        mpath = os.path.join(cfg["root_dir"], f"experiment_results/experiments/{mh_filename}.pt")
+        mhpath = os.path.join(cfg["root_dir"], f"experiment_results/experiments/{mh_filename}_history.pt")
+        opath = os.path.join(cfg["root_dir"], f"experiment_results/experiments/{mh_filename}_optimizer.pt")
 
     model = torch.load(mpath, map_location = torch.device(cfg["device"]))
     model_history = torch.load(mhpath, map_location = torch.device(cfg["device"]))
@@ -245,7 +226,6 @@ def convert_model2current(model, model_filename, is_chkpt = True, is_best = Fals
     new_curr = {
         "model_complete": False,
         "model_history": saved_model_history,
-        "best_state": model_state,
         "last_state": model_state
     }
     new_curr['model_state'] = saved_model_state

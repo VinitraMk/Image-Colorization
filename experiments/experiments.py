@@ -96,8 +96,8 @@ class Experiment:
         model_info = {}
         epoch_arr = list(range(epoch_index, num_epochs))
         disable_tqdm_log = True
-        for i in epoch_arr:
-            if ((i+1) % epoch_ivl == 0) or i == 0:
+        for epoch_i,i in enumerate(epoch_arr):
+            if ((i+1) % epoch_ivl == 0) or epoch_i == 0:
                 print(f'\tRunning Epoch {i+1}')
                 disable_tqdm_log = False
             model.train()
@@ -133,7 +133,7 @@ class Experiment:
                     #torch.cuda.empty_cache()
             val_loss /= val_len
             vallosshistory.append(val_loss)
-            if ((i+1) % epoch_ivl == 0) or i == 0:
+            if ((i+1) % epoch_ivl == 0) or epoch_i == 0:
                 print(f'\tEpoch {i+1} Training Loss: {tr_loss}')
                 print(f"\tEpoch {i+1} Validation Loss: {val_loss}")
 
@@ -146,7 +146,7 @@ class Experiment:
                 'epoch': i
             }
             self.save_model_checkpoint(model.state_dict(), self.optimizer.state_dict(),
-            self.all_folds_res, model_info, False, 'last_state')
+            self.all_folds_res, model_info, False)
             disable_tqdm_log = True
 
         model_info = {
@@ -173,7 +173,7 @@ class Experiment:
             self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
             ops = saved_model['optimizer_state']
             self.optimizer.load_state_dict(ops)
-            return model, saved_model["last_state"], saved_model["best_state"]
+            return model, saved_model["last_state"]
         else:
             if self.exp_params['model']['build_on_pretrained']:
                 # do something
@@ -186,7 +186,7 @@ class Experiment:
                 self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
             else:
                 self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
-            return model, None, None
+            return model, None
 
     def train(self):
         train_loader = {}
@@ -196,7 +196,7 @@ class Experiment:
             print("Running straight split")
             model = get_model(self.model_name)
             model = model.to(self.device)
-            model, ls, bs = self.__get_experiment_chkpt(model)
+            model, ls = self.__get_experiment_chkpt(model)
             epoch_index = 0 if ls == None else ls['epoch'] + 1
             vp = self.exp_params['train']['val_percentage'] / 100
             fl = len(self.ftr_dataset)
@@ -234,13 +234,14 @@ class Experiment:
             raise SystemExit("Error: no valid split method passed! Check run.yaml")
 
     def save_model_checkpoint(self, model_state, optimizer_state, model_history, chkpt_info,
-    is_final = False, chkpt_type = 'last_state'):
+    is_final = False):
         if is_final:
             save_experiment_output(model_state, chkpt_info, self.exp_params,
-                True, False)
-            save_model_helpers(model_history, optimizer_state, '', True, False)
+                True)
+            save_model_helpers(model_history, optimizer_state, '', True)
             os.remove(os.path.join(self.root_dir, "models/checkpoints/current_model.pt"))
         else:
-            save_experiment_chkpt(model_state, optimizer_state, chkpt_info, model_history, chkpt_type)
+            save_experiment_chkpt(model_state, optimizer_state, chkpt_info, model_history)
+
 
 

@@ -131,11 +131,12 @@ class ModelTester:
         running_loss = 0.0
         acc = 0
         for _, batch in enumerate(self.te_loader):
-            op = self.model(batch[self.X_key])
-            loss = loss_fn(op, batch[self.y_key])
-            running_loss += loss.item()
-            acc = get_accuracy(op, batch[self.y_key])
-            self.__plot_predicted_images(batch[self.X_key], op, RGB, ABtrue)
+            with torch.no_grad():
+                op = self.model(batch[self.X_key])
+                loss = loss_fn(op, batch[self.y_key])
+                running_loss += loss.item()
+                acc = get_accuracy(op, batch[self.y_key])
+                self.__plot_predicted_images(batch[self.X_key], op, RGB, ABtrue)
         print("\nTest Loss:", running_loss/len(self.te_loader))
         print("Test Accuracy:", acc/len(self.te_loader), "\n")
 
@@ -145,15 +146,16 @@ class ModelTester:
         acc = 0
 
         for batch_idx, batch in enumerate(self.te_loader):
-            batch[self.X_key], batch[self.y_key] = self.__get_lab_images(batch['RGB'])
-            op = self.model(batch[self.X_key])
-            loss = loss_fn(op, batch[self.y_key])
-            running_loss += loss.item()
-            acc = get_accuracy(op, batch[self.y_key])
-            RGB = batch['RGB'].transpose(1, 3).transpose(1, 2)
-            if batch_idx == 0:
-                self.__plot_predicted_images(batch[self.X_key], op, RGB, batch[self.y_key])
-            del RGB
+            with torch.no_grad():
+                batch[self.X_key], batch[self.y_key] = self.__get_lab_images(batch['RGB'])
+                op = self.model(batch[self.X_key])
+                loss = loss_fn(op, batch[self.y_key])
+                running_loss += loss.item()
+                acc = get_accuracy(op, batch[self.y_key])
+                RGB = batch['RGB'].transpose(1, 3).transpose(1, 2)
+                if batch_idx == 0:
+                    self.__plot_predicted_images(batch[self.X_key], op, RGB, batch[self.y_key])
+                del RGB
         print("\nTest Loss:", running_loss/len(self.te_loader))
         print("Test Accuracy:", acc/len(self.te_loader), "\n")
 
