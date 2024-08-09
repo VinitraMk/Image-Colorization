@@ -22,7 +22,8 @@ Project results - this section here is for describing the results of the differe
 | Sr.No | Model | Parameters | Accuracy | Validation Loss | Test Loss | Remarks |
 | ----- | ----- | ---------- | -------- | ---- | ----- | ------- |
 | 1 | Conv-Net | lr: 0.00008, batch_size: 64, num_epochs: 150 | NA |  0.0684 | 0.0952 | Batch size 64 performed better for training set |
+| 2 | Conv-Net | lr: 0.0001, batch_size: 32, num_epochs: 1000 | NA | 0.03804 | | |
 
 ## Best Model Results
 
-![Test results](./output/experiment_results/best_experiments/conv-net/test_results.png)
+![Test results](./output/experiment_results/best_experiments/conv-net/test_results_3.png)

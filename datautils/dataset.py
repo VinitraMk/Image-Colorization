@@ -37,7 +37,7 @@ class CustomImagenetDataset(Dataset):
         return len(self.data_files)
     
     def __getitem__(self, idx):
-        rgb_tensor = read_image(self.data_files[idx]) 
+        rgb_tensor = read_image(self.data_files[idx]) / 255.0
         sample = { 'RGB': rgb_tensor }
         
         return sample
